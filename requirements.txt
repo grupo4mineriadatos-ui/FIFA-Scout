@@ -1,2 +1,18 @@
-# Versiones fijadas (==) para que el entorno de Streamlit Cloud sea IDÉNTICO
-# al usado para serializar modelo_gb_pipeline.jo
+# Nucleo ML: fijado EXACTO porque debe coincidir con el entorno donde se
+# genero modelo_gb_pipeline.joblib (evita el ModuleNotFoundError al
+# deserializar). Si conoces las versiones reales de tu entorno de
+# entrenamiento, reemplaza estos 4 numeros por esos.
+scikit-learn==1.5.2
+numpy==1.26.4
+joblib==1.4.2
+scipy==1.13.1
+ 
+# Resto del stack: rango flexible a proposito. Fijar todo con "=="
+# puede generar una combinacion irresoluble o forzar una recompilacion
+# pesada (sobre todo shap, que depende de numba/llvmlite) y tirar abajo
+# TODA la instalacion -- que es lo que causo el ultimo error.
+pandas>=2.2.0,<2.3.0
+streamlit>=1.36.0,<1.40.0
+plotly>=5.20.0,<6.0.0
+matplotlib>=3.8.0,<3.10.0
+shap>=0.45.0,<0.47.0
