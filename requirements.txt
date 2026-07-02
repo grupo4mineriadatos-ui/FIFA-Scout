@@ -1,15 +1,18 @@
-# Nucleo ML: fijado EXACTO porque debe coincidir con el entorno donde se
-# genero modelo_gb_pipeline.joblib (evita el ModuleNotFoundError al
-# deserializar). Si conoces las versiones reales de tu entorno de
-# entrenamiento, reemplaza estos 4 numeros por esos.
-scikit-learn==1.5.2
+# Stack COMPLETO fijado con versiones exactas, verificadas como mutuamente
+# compatibles entre si y con wheels precompilados para Python 3.11 (fijado
+# en "Advanced settings" al crear el deploy en Streamlit Community Cloud).
+# No usar rangos (">=") aca: en los intentos anteriores, cualquier paquete
+# sin version exacta termino siendo el que fallaba al importar en runtime
+# porque el resolver (uv/pip) eligio una version incompatible o el build
+# se corto antes de instalarlo.
 numpy==1.26.4
-joblib==1.4.2
 scipy==1.13.1
-
-# SHAP y su cadena de dependencias (numba/llvmlite) son la causa mas comun
-# de builds colgados: si no se fijan exactas, pip prueba muchas
-# combinaciones (backtracking) o termina compilando llvmlite desde
-# codigo fuente, que puede tardar mas de una hora o directamente fallar
-# en el hardware gratuito de Streamlit Cloud. Estas 3 versiones son
-# mutuamente compatibles y tienen wheels p
+scikit-learn==1.5.2
+joblib==1.4.2
+pandas==2.2.2
+streamlit==1.38.0
+plotly==5.24.1
+matplotlib==3.9.2
+shap==0.46.0
+numba==0.60.0
+llvmlite==0.43.0
