@@ -1,0 +1,779 @@
+"""
+FIFA Scout — Web App de Scouting de Jugadores
+================================================
+TP4 · Licenciatura en Ciencias de Datos · Inteligencia Artificial y Aprendizaje Automático I
+
+App de scouting que despliega el modelo ganador del TP2 (Gradient Boosting
+Optimizado, Pipeline StandardScaler + GradientBoostingRegressor) para predecir
+el potencial de crecimiento de jugadores de fútbol, con explicabilidad SHAP,
+carga masiva por CSV y un espacio reservado para el clasificador de posición del TP3.
+"""
+
+import os
+
+import joblib
+import numpy as np
+import pandas as pd
+import plotly.express as px
+import plotly.graph_objects as go
+import streamlit as st
+
+# ============================================================
+# CONFIGURACIÓN DE PÁGINA
+# ============================================================
+st.set_page_config(
+    page_title="FIFA Scout",
+    page_icon="⚽",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
+
+# ============================================================
+# PALETA Y ESTILO — minimalista: grises, azul oscuro, acento verde
+# ============================================================
+COLOR_DARK = "#0B2545"      # azul oscuro (headers, texto fuerte)
+COLOR_GRAY = "#5B6472"      # gris (texto secundario)
+COLOR_BG_SOFT = "#F4F5F7"   # gris muy claro (fondos de tarjetas)
+COLOR_ACCENT = "#1E8F6F"    # verde (acento principal / positivo)
+COLOR_GOLD = "#C9A227"      # dorado (acento secundario / élite)
+COLOR_WARN = "#B45309"      # naranja (alertas suaves)
+
+st.markdown(
+    f"""
+    <style>
+        .block-container {{ padding-top: 2rem; }}
+        h1, h2, h3 {{ color: {COLOR_DARK}; }}
+        [data-testid="stMetricValue"] {{ color: {COLOR_DARK}; }}
+        [data-testid="stSidebar"] {{ background-color: {COLOR_BG_SOFT}; }}
+        .fifa-badge {{
+            display:inline-block; padding:2px 10px; border-radius:12px;
+            background:{COLOR_ACCENT}; color:white; font-size:0.75rem; font-weight:600;
+        }}
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
+# ============================================================
+# CONSTANTES DEL MODELO — deben coincidir EXACTO con el TP2
+# ============================================================
+MODEL_PATH = "modelo_gb_pipeline.joblib"
+DATA_PATH = "fifa_players_model_ready.csv"
+TP3_MODEL_PATH = "modelo_clasificador_tp3.joblib"
+
+FEATURES_BASE = [
+    "age", "overall_rating",
+    "vision", "agility", "standing_tackle", "strength",
+    "international_reputation(1-5)", "weak_foot(1-5)", "skill_moves(1-5)",
+]
+FEATURES_TP1 = [
+    "attack_score", "defense_score", "playmaking_score", "physical_score",
+    "has_release_clause",
+]
+FEATURES_NUEVAS = [
+    "preferred_foot_enc",   # 0 = Izquierdo, 1 = Derecho
+    "nationality_freq",     # frecuencia de aparición de la nacionalidad en el dataset
+]
+POSITION_COLS = [
+    "pos_Arquero", "pos_Defensor Central", "pos_Delantero Centro",
+    "pos_Extremo", "pos_Lateral", "pos_Mediocampista Defensivo",
+    "pos_Mediocampista Ofensivo",
+]
+ALL_FEATURES = FEATURES_BASE + FEATURES_TP1 + FEATURES_NUEVAS + POSITION_COLS
+TARGET = "potential"
+
+POSICIONES = [c.replace("pos_", "") for c in POSITION_COLS]
+
+# Métricas reales del TP2 (extraídas del notebook, tabla comparativa final)
+COMPARATIVA_MODELOS = pd.DataFrame([
+    {"Modelo": "Regresión Lineal",              "R2_test": 0.8328, "MAE": 1.9558, "RMSE": 2.4794, "Gap_%": 0.05},
+    {"Modelo": "Árbol de Decisión",              "R2_test": 0.9200, "MAE": 1.1234, "RMSE": 1.7151, "Gap_%": 0.98},
+    {"Modelo": "KNN (7 features, K=9)",          "R2_test": 0.9029, "MAE": 1.3427, "RMSE": 1.8898, "Gap_%": 2.14},
+    {"Modelo": "Random Forest (base)",           "R2_test": 0.9301, "MAE": 1.0205, "RMSE": 1.6033, "Gap_%": 5.99},
+    {"Modelo": "GB Optimizado (GridSearchCV) ✅", "R2_test": 0.9355, "MAE": 0.9973, "RMSE": 1.5402, "Gap_%": 2.23},
+])
+
+HIPERPARAMETROS_GB = {
+    "learning_rate": 0.05,
+    "max_depth": 5,
+    "n_estimators": 300,
+    "subsample": 0.8,
+}
+
+
+# ============================================================
+# CARGA CON CACHÉ
+# ============================================================
+@st.cache_resource(show_spinner=False)
+def load_model():
+    """Carga el pipeline GB Optimizado serializado en el TP2."""
+    if not os.path.exists(MODEL_PATH):
+        return None
+    return joblib.load(MODEL_PATH)
+
+
+@st.cache_resource(show_spinner=False)
+def load_tp3_model():
+    """Carga el clasificador de posición del TP3 si ya está disponible."""
+    if not os.path.exists(TP3_MODEL_PATH):
+        return None
+    return joblib.load(TP3_MODEL_PATH)
+
+
+@st.cache_data(show_spinner=False)
+def load_data():
+    """Carga el dataset del TP1 y agrega la predicción de potencial para todo el dataset."""
+    df = pd.read_csv(DATA_PATH)
+    modelo = load_model()
+    if modelo is not None:
+        df["potential_predicho"] = np.round(modelo.predict(df[ALL_FEATURES]), 2)
+    else:
+        df["potential_predicho"] = np.nan
+    return df
+
+
+def resolve_display_columns(df: pd.DataFrame):
+    """
+    Resuelve de forma robusta los nombres de columnas de presentación
+    (nombre corto, nombre largo, club, posición legible), ya que pueden
+    variar levemente según la versión del dataset procesado en el TP1.
+    """
+    short_col = next((c for c in ["short_name", "name"] if c in df.columns), df.columns[0])
+    long_col = next((c for c in ["long_name", "full_name"] if c in df.columns), short_col)
+    club_col = next((c for c in ["club_name", "club"] if c in df.columns), None)
+    position_col = next((c for c in ["specific_position", "player_positions", "positions"] if c in df.columns), None)
+    return short_col, long_col, club_col, position_col
+
+
+def formatear_euros(valor: float) -> str:
+    if pd.isna(valor):
+        return "—"
+    if valor >= 1_000_000:
+        return f"€{valor / 1_000_000:.2f}M"
+    if valor >= 1_000:
+        return f"€{valor / 1_000:.0f}K"
+    return f"€{valor:.0f}"
+
+
+def clasificar_potencial(p: float) -> str:
+    if p < 65:
+        return "Jugador de relleno"
+    if p < 75:
+        return "Suplente confiable"
+    if p < 82:
+        return "Titular sólido"
+    if p < 88:
+        return "Jugador de alto nivel"
+    return "Élite mundial"
+
+
+# ============================================================
+# ESTADO DE SESIÓN — monitoreo básico (actividad de extensión)
+# ============================================================
+if "n_predicciones" not in st.session_state:
+    st.session_state.n_predicciones = 0
+if "n_predicciones_lote" not in st.session_state:
+    st.session_state.n_predicciones_lote = 0
+
+# ============================================================
+# CARGA INICIAL
+# ============================================================
+modelo = load_model()
+modelo_disponible = modelo is not None
+
+if modelo_disponible:
+    df = load_data()
+    SHORT_COL, LONG_COL, CLUB_COL, POSITION_COL = resolve_display_columns(df)
+else:
+    df = None
+    SHORT_COL = LONG_COL = CLUB_COL = POSITION_COL = None
+
+# ============================================================
+# SIDEBAR — navegación + contador de sesión
+# ============================================================
+st.sidebar.markdown("## ⚽ FIFA Scout")
+st.sidebar.caption("Scouting de jugadores basado en Machine Learning")
+st.sidebar.markdown("---")
+
+pagina = st.sidebar.radio(
+    "Navegación",
+    [
+        "🔍 Explorador de Joyas",
+        "⚡ Predictor Individual",
+        "📁 Análisis en Lote",
+        "🎯 Clasificador de Posición",
+        "📊 Sobre el Modelo",
+    ],
+    label_visibility="collapsed",
+)
+
+st.sidebar.markdown("---")
+st.sidebar.markdown(
+    f"**Predicciones realizadas en esta sesión:** "
+    f"{st.session_state.n_predicciones + st.session_state.n_predicciones_lote}"
+)
+st.sidebar.caption("Monitoreo básico de uso (session_state)")
+
+if not modelo_disponible:
+    st.sidebar.error(
+        f"No se encontró '{MODEL_PATH}'. Ejecutá la celda de serialización del "
+        f"TP2 y colocá el archivo en la carpeta de la app."
+    )
+
+# ============================================================
+# PÁGINA 1 — EXPLORADOR DE JOYAS
+# ============================================================
+if pagina == "🔍 Explorador de Joyas":
+    st.title("🔍 Explorador de Joyas")
+    st.caption("Identificá jugadores jóvenes con alto potencial predicho y bajo valor de mercado.")
+
+    if not modelo_disponible:
+        st.error(
+            "Esta página requiere el modelo entrenado. Colocá "
+            f"`{MODEL_PATH}` en la carpeta de la app y recargá."
+        )
+        st.stop()
+
+    # ---------------- FILTROS (sidebar) ----------------
+    st.sidebar.markdown("### Filtros")
+
+    posiciones_sel = st.sidebar.multiselect(
+        "Posición", options=POSICIONES, default=[],
+        help="Sin selección = todas las posiciones",
+    )
+
+    edad_min, edad_max = st.sidebar.slider("Rango de edad", 15, 45, (15, 45))
+
+    valor_max_dataset = float(df["value_euro"].max()) / 1_000_000
+    valor_min_sel, valor_max_sel = st.sidebar.slider(
+        "Valor de mercado (millones €)", 0.0, round(valor_max_dataset, 1),
+        (0.0, round(valor_max_dataset, 1)), step=0.5,
+    )
+
+    nacionalidades_sel = st.sidebar.multiselect(
+        "Nacionalidad", options=sorted(df["nationality"].unique()), default=[],
+        help="Sin selección = todas las nacionalidades",
+    )
+
+    overall_min = st.sidebar.slider("Overall rating mínimo", 50, 99, 50)
+
+    # ---------------- APLICAR FILTROS ----------------
+    df_f = df.copy()
+    if POSITION_COL and posiciones_sel:
+        df_f = df_f[df_f[POSITION_COL].isin(posiciones_sel)]
+    df_f = df_f[(df_f["age"] >= edad_min) & (df_f["age"] <= edad_max)]
+    df_f = df_f[
+        (df_f["value_euro"] >= valor_min_sel * 1_000_000)
+        & (df_f["value_euro"] <= valor_max_sel * 1_000_000)
+    ]
+    if nacionalidades_sel:
+        df_f = df_f[df_f["nationality"].isin(nacionalidades_sel)]
+    df_f = df_f[df_f["overall_rating"] >= overall_min]
+
+    st.caption(f"Mostrando **{len(df_f):,}** jugadores de {len(df):,} totales según los filtros aplicados.")
+
+    # ---------------- SCATTER PRINCIPAL ----------------
+    if df_f.empty:
+        st.warning("Ningún jugador cumple con los filtros seleccionados. Ajustá los criterios.")
+    else:
+        hover_cols = {
+            SHORT_COL: True,
+            "nationality": True,
+            "age": True,
+            "overall_rating": True,
+            "potential_predicho": True,
+            "value_euro": ":,.0f",
+        }
+        if CLUB_COL:
+            hover_cols[CLUB_COL] = True
+
+        fig = px.scatter(
+            df_f,
+            x=df_f["value_euro"] / 1_000_000,
+            y="potential_predicho",
+            color="age",
+            size="overall_rating",
+            size_max=18,
+            color_continuous_scale=[COLOR_ACCENT, "#F2C14E", COLOR_WARN],
+            hover_name=SHORT_COL,
+            hover_data=hover_cols,
+            labels={
+                "x": "Valor de mercado (millones €)",
+                "potential_predicho": "Potencial predicho",
+                "age": "Edad",
+            },
+            title="Valor de Mercado vs. Potencial Predicho",
+            opacity=0.72,
+        )
+        fig.update_layout(
+            height=560,
+            xaxis_title="Valor de mercado (millones €)",
+            yaxis_title="Potencial predicho",
+            plot_bgcolor="white",
+            title_font_color=COLOR_DARK,
+        )
+        st.plotly_chart(fig, use_container_width=True)
+
+    st.markdown("---")
+
+    # ---------------- TABLA JOYAS OCULTAS ----------------
+    st.subheader("💎 Joyas Ocultas")
+    st.caption("Jóvenes (≤23 años) con potencial predicho ≥ 80 y valor de mercado en el 25% más bajo del subconjunto filtrado.")
+
+    def calcular_joyas(data, edad_tope, percentil, potencial_min):
+        if data.empty:
+            return data
+        umbral_valor = data["value_euro"].quantile(percentil)
+        return data[
+            (data["potential_predicho"] >= potencial_min)
+            & (data["value_euro"] <= umbral_valor)
+            & (data["age"] <= edad_tope)
+        ]
+
+    criterios_relajados = []
+    joyas = calcular_joyas(df_f, 23, 0.25, 80)
+
+    if joyas.empty:
+        joyas = calcular_joyas(df_f, 25, 0.25, 78)
+        criterios_relajados.append("edad ≤ 25 y potencial ≥ 78")
+    if joyas.empty:
+        joyas = calcular_joyas(df_f, 25, 0.40, 75)
+        criterios_relajados.append("percentil de valor 40% y potencial ≥ 75")
+    if joyas.empty and not df_f.empty:
+        joyas = df_f.sort_values("potential_predicho", ascending=False).head(20)
+        criterios_relajados.append("sin restricción de edad/valor — se muestra el top 20 por potencial predicho")
+
+    if criterios_relajados:
+        st.info(
+            "No se encontraron jugadores con los criterios estrictos de 'joya oculta'. "
+            f"Se relajaron los filtros automáticamente ({criterios_relajados[-1]})."
+        )
+
+    joyas = joyas.sort_values("potential_predicho", ascending=False).head(20)
+
+    if joyas.empty:
+        st.warning("No hay jugadores para mostrar con los filtros actuales.")
+    else:
+        tabla = pd.DataFrame({
+            "Nombre": joyas[SHORT_COL].values,
+            "Nacionalidad": joyas["nationality"].values,
+            "Club": joyas[CLUB_COL].values if CLUB_COL else "No disponible",
+            "Edad": joyas["age"].values,
+            "Overall": joyas["overall_rating"].values,
+            "Potencial Predicho": joyas["potential_predicho"].values,
+            "Valor (€)": [formatear_euros(v) for v in joyas["value_euro"].values],
+        })
+        st.dataframe(tabla, use_container_width=True, hide_index=True)
+
+# ============================================================
+# PÁGINA 2 — PREDICTOR INDIVIDUAL
+# ============================================================
+elif pagina == "⚡ Predictor Individual":
+    st.title("⚡ Predictor Individual")
+    st.caption("Ingresá los atributos de un jugador y obtené su potencial de crecimiento predicho.")
+
+    if not modelo_disponible:
+        st.error(
+            "Esta página requiere el modelo entrenado. Colocá "
+            f"`{MODEL_PATH}` en la carpeta de la app y recargá."
+        )
+        st.stop()
+
+    rangos = df[FEATURES_BASE + FEATURES_TP1[:4]].agg(["min", "max"]).to_dict()
+
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+        st.markdown("**Atributos base**")
+        age = st.slider("Edad", int(rangos["age"]["min"]), int(rangos["age"]["max"]), 22)
+        overall_rating = st.slider(
+            "Overall rating", int(rangos["overall_rating"]["min"]), int(rangos["overall_rating"]["max"]), 70
+        )
+        vision = st.slider("Visión", int(rangos["vision"]["min"]), int(rangos["vision"]["max"]), 55)
+        agility = st.slider("Agilidad", int(rangos["agility"]["min"]), int(rangos["agility"]["max"]), 65)
+        standing_tackle = st.slider(
+            "Entrada de pie (standing tackle)", int(rangos["standing_tackle"]["min"]),
+            int(rangos["standing_tackle"]["max"]), 48
+        )
+        strength = st.slider("Fuerza", int(rangos["strength"]["min"]), int(rangos["strength"]["max"]), 65)
+
+    with col2:
+        st.markdown("**Reputación y scores TP1**")
+        international_reputation = st.slider("Reputación internacional (1-5)", 1, 5, 1)
+        weak_foot = st.slider("Pie malo (1-5)", 1, 5, 3)
+        skill_moves = st.slider("Habilidad de gambeta (1-5)", 1, 5, 2)
+        attack_score = st.slider(
+            "Attack score", float(rangos["attack_score"]["min"]), float(rangos["attack_score"]["max"]), 48.0
+        )
+        defense_score = st.slider(
+            "Defense score", float(rangos["defense_score"]["min"]), float(rangos["defense_score"]["max"]), 48.0
+        )
+
+    with col3:
+        st.markdown("**Contexto y posición**")
+        playmaking_score = st.slider(
+            "Playmaking score", float(df["playmaking_score"].min()), float(df["playmaking_score"].max()), 55.0
+        )
+        physical_score = st.slider(
+            "Physical score", float(df["physical_score"].min()), float(df["physical_score"].max()), 65.0
+        )
+        has_release_clause = st.selectbox("¿Tiene cláusula de rescisión?", ["Sí", "No"]) == "Sí"
+        preferred_foot = st.selectbox("Pie preferido", ["Derecho", "Izquierdo"])
+        nacionalidad_sel = st.selectbox("Nacionalidad", sorted(df["nationality"].unique()))
+        posicion_sel = st.selectbox("Posición específica", POSICIONES)
+
+    st.caption(
+        "Nacionalidad y posición se ingresan por nombre y se codifican automáticamente "
+        "(`nationality_freq` = frecuencia real en el dataset, `pos_*` = one-hot exclusivo) "
+        "para evitar combinaciones inválidas que el modelo nunca vio en entrenamiento."
+    )
+
+    predecir = st.button("Predecir Potencial", type="primary")
+
+    if predecir:
+        nationality_freq = int(df["nationality"].value_counts().get(nacionalidad_sel, 1))
+        fila = {
+            "age": age, "overall_rating": overall_rating,
+            "vision": vision, "agility": agility,
+            "standing_tackle": standing_tackle, "strength": strength,
+            "international_reputation(1-5)": international_reputation,
+            "weak_foot(1-5)": weak_foot, "skill_moves(1-5)": skill_moves,
+            "attack_score": attack_score, "defense_score": defense_score,
+            "playmaking_score": playmaking_score, "physical_score": physical_score,
+            "has_release_clause": int(has_release_clause),
+            "preferred_foot_enc": 1 if preferred_foot == "Derecho" else 0,
+            "nationality_freq": nationality_freq,
+        }
+        for pos in POSICIONES:
+            fila[f"pos_{pos}"] = 1 if pos == posicion_sel else 0
+
+        X_input = pd.DataFrame([fila])[ALL_FEATURES]
+
+        try:
+            potencial_pred = float(modelo.predict(X_input)[0])
+        except Exception as e:
+            st.error(f"No se pudo calcular la predicción: {e}")
+            st.stop()
+
+        st.session_state.n_predicciones += 1
+
+        st.markdown("---")
+        res_col1, res_col2 = st.columns([1, 2])
+
+        with res_col1:
+            st.markdown(
+                f"<h1 style='color:{COLOR_DARK}; font-size:4rem; margin-bottom:0;'>"
+                f"{potencial_pred:.1f}</h1>",
+                unsafe_allow_html=True,
+            )
+            st.markdown(
+                f"<span class='fifa-badge'>{clasificar_potencial(potencial_pred)}</span>",
+                unsafe_allow_html=True,
+            )
+
+        with res_col2:
+            gauge = go.Figure(go.Indicator(
+                mode="gauge+number",
+                value=potencial_pred,
+                domain={"x": [0, 1], "y": [0, 1]},
+                gauge={
+                    "axis": {"range": [50, 99]},
+                    "bar": {"color": COLOR_DARK},
+                    "steps": [
+                        {"range": [50, 65], "color": "#E5E7EB"},
+                        {"range": [65, 75], "color": "#BFDBFE"},
+                        {"range": [75, 82], "color": "#93C5FD"},
+                        {"range": [82, 88], "color": "#6EE7B7"},
+                        {"range": [88, 99], "color": COLOR_GOLD},
+                    ],
+                },
+            ))
+            gauge.update_layout(height=280, margin=dict(l=20, r=20, t=20, b=20))
+            st.plotly_chart(gauge, use_container_width=True)
+
+        # ---------------- SHAP — explicabilidad ----------------
+        st.markdown("---")
+        st.subheader("¿Por qué el modelo predijo esto?")
+
+        with st.spinner("Calculando explicabilidad..."):
+            try:
+                import shap
+
+                scaler = modelo.named_steps["scaler"]
+                arbol = modelo.named_steps["model"]
+                X_scaled = scaler.transform(X_input)
+
+                explainer = shap.TreeExplainer(arbol)
+                shap_values = explainer.shap_values(X_scaled, check_additivity=False)
+
+                explicacion = shap.Explanation(
+                    values=shap_values[0],
+                    base_values=explainer.expected_value,
+                    data=X_input.values[0],
+                    feature_names=ALL_FEATURES,
+                )
+
+                import matplotlib.pyplot as plt
+
+                fig_shap, ax = plt.subplots(figsize=(9, 5))
+                shap.plots.waterfall(explicacion, max_display=10, show=False)
+                st.pyplot(fig_shap, use_container_width=True)
+                plt.close(fig_shap)
+
+                top_feats = pd.Series(np.abs(shap_values[0]), index=ALL_FEATURES).sort_values(ascending=False)
+                top3 = ", ".join(top_feats.head(3).index.tolist())
+                st.markdown(f"Las variables que más influyeron en esta predicción son: **{top3}**.")
+            except ImportError:
+                st.warning("La librería `shap` no está instalada. Agregala a requirements.txt para ver esta sección.")
+            except Exception as e:
+                st.error(f"No se pudo calcular la explicabilidad SHAP: {e}")
+
+# ============================================================
+# PÁGINA 3 — ANÁLISIS EN LOTE
+# ============================================================
+elif pagina == "📁 Análisis en Lote":
+    st.title("📁 Análisis en Lote")
+    st.caption("Subí un CSV con múltiples jugadores y obtené el potencial predicho para todos a la vez.")
+
+    if not modelo_disponible:
+        st.error(
+            "Esta página requiere el modelo entrenado. Colocá "
+            f"`{MODEL_PATH}` en la carpeta de la app y recargá."
+        )
+        st.stop()
+
+    with st.expander("📋 Columnas requeridas en el CSV", expanded=False):
+        st.write(f"El archivo debe contener exactamente estas **{len(ALL_FEATURES)} columnas**:")
+        st.code(", ".join(ALL_FEATURES))
+
+    plantilla = pd.DataFrame(columns=ALL_FEATURES)
+    st.download_button(
+        "⬇️ Descargar plantilla CSV",
+        data=plantilla.to_csv(index=False).encode("utf-8"),
+        file_name="plantilla_fifa_scout.csv",
+        mime="text/csv",
+    )
+
+    archivo = st.file_uploader("Subí tu CSV", type=["csv"])
+
+    if archivo is not None:
+        try:
+            df_lote = pd.read_csv(archivo)
+        except Exception as e:
+            st.error(f"No se pudo leer el archivo: {e}")
+            st.stop()
+
+        faltantes = [c for c in ALL_FEATURES if c not in df_lote.columns]
+        if faltantes:
+            st.error(
+                f"Al CSV le faltan {len(faltantes)} columna(s) requerida(s): "
+                f"{', '.join(faltantes)}"
+            )
+        else:
+            with st.spinner("Aplicando el modelo al lote..."):
+                df_pred = df_lote.copy()
+                for col in ALL_FEATURES:
+                    df_pred[col] = pd.to_numeric(df_pred[col], errors="coerce")
+
+                filas_invalidas = df_pred[ALL_FEATURES].isnull().any(axis=1).sum()
+                if filas_invalidas > 0:
+                    st.warning(
+                        f"{filas_invalidas} fila(s) tienen valores no numéricos o vacíos en alguna "
+                        f"columna requerida y fueron excluidas del cálculo."
+                    )
+                df_validas = df_pred.dropna(subset=ALL_FEATURES).copy()
+
+                if df_validas.empty:
+                    st.error("Ninguna fila del CSV tiene datos válidos para predecir.")
+                else:
+                    df_validas["potential_predicho"] = np.round(
+                        modelo.predict(df_validas[ALL_FEATURES]), 2
+                    )
+                    st.session_state.n_predicciones_lote += len(df_validas)
+
+                    st.success(f"Predicciones calculadas para {len(df_validas):,} jugadores.")
+
+                    m1, m2, m3, m4 = st.columns(4)
+                    m1.metric("Jugadores procesados", f"{len(df_validas):,}")
+                    m2.metric("Potencial promedio", f"{df_validas['potential_predicho'].mean():.1f}")
+                    m3.metric("Potencial máximo", f"{df_validas['potential_predicho'].max():.1f}")
+                    m4.metric("Potencial mínimo", f"{df_validas['potential_predicho'].min():.1f}")
+
+                    st.dataframe(df_validas, use_container_width=True, hide_index=True)
+
+                    st.download_button(
+                        "⬇️ Descargar resultados",
+                        data=df_validas.to_csv(index=False).encode("utf-8"),
+                        file_name="predicciones_fifa_scout.csv",
+                        mime="text/csv",
+                    )
+
+# ============================================================
+# PÁGINA 4 — CLASIFICADOR DE POSICIÓN (placeholder TP3)
+# ============================================================
+elif pagina == "🎯 Clasificador de Posición":
+    st.title("🎯 Clasificador de Posición")
+    st.caption("Esta sección integra el modelo de clasificación de posición desarrollado en el TP3.")
+
+    modelo_tp3 = load_tp3_model()
+
+    if modelo_tp3 is None:
+        st.info("🔄 El modelo de clasificación será integrado próximamente.")
+        st.markdown(
+            f"Cuando el archivo `{TP3_MODEL_PATH}` esté disponible, colocalo en la carpeta "
+            "de la app: la interfaz de clasificación (sliders → posición predicha) se activa "
+            "automáticamente, sin modificar el código."
+        )
+
+        if modelo_disponible and POSITION_COL:
+            st.subheader("Distribución de posiciones en el dataset")
+            conteo = df[POSITION_COL].value_counts().reset_index()
+            conteo.columns = ["Posición", "Cantidad"]
+            fig = px.bar(
+                conteo, x="Cantidad", y="Posición", orientation="h",
+                color_discrete_sequence=[COLOR_DARK],
+                title="Cantidad de jugadores por posición",
+            )
+            fig.update_layout(height=420, plot_bgcolor="white")
+            st.plotly_chart(fig, use_container_width=True)
+    else:
+        # El modelo TP3 ya está disponible: se arma la interfaz dinámicamente
+        # a partir de las features que el propio modelo espera.
+        st.success("Modelo de clasificación del TP3 cargado correctamente.")
+
+        if hasattr(modelo_tp3, "feature_names_in_"):
+            features_tp3 = list(modelo_tp3.feature_names_in_)
+        else:
+            st.warning(
+                "El modelo no expone `feature_names_in_`; se usan las features del TP2 "
+                "como aproximación. Verificá que coincidan con las usadas en el TP3."
+            )
+            features_tp3 = ALL_FEATURES
+
+        st.markdown("**Ingresá los atributos del jugador:**")
+        cols = st.columns(3)
+        entrada_tp3 = {}
+        for i, feat in enumerate(features_tp3):
+            with cols[i % 3]:
+                if modelo_disponible and feat in df.columns and pd.api.types.is_numeric_dtype(df[feat]):
+                    lo, hi = float(df[feat].min()), float(df[feat].max())
+                    default = float(df[feat].median())
+                    entrada_tp3[feat] = st.slider(feat, lo, hi, default)
+                else:
+                    entrada_tp3[feat] = st.slider(feat, 0.0, 100.0, 50.0)
+
+        if st.button("Predecir Posición", type="primary"):
+            X_tp3 = pd.DataFrame([entrada_tp3])[features_tp3]
+            try:
+                pred_pos = modelo_tp3.predict(X_tp3)[0]
+                st.session_state.n_predicciones += 1
+                st.markdown(f"### Posición predicha: **{pred_pos}**")
+
+                if hasattr(modelo_tp3, "predict_proba"):
+                    proba = modelo_tp3.predict_proba(X_tp3)[0]
+                    clases = modelo_tp3.classes_
+                    df_proba = pd.DataFrame({"Posición": clases, "Probabilidad": proba}).sort_values(
+                        "Probabilidad", ascending=False
+                    )
+                    fig = px.bar(
+                        df_proba, x="Probabilidad", y="Posición", orientation="h",
+                        color_discrete_sequence=[COLOR_ACCENT],
+                    )
+                    fig.update_layout(height=350, plot_bgcolor="white")
+                    st.plotly_chart(fig, use_container_width=True)
+            except Exception as e:
+                st.error(f"No se pudo calcular la predicción: {e}")
+
+# ============================================================
+# PÁGINA 5 — SOBRE EL MODELO
+# ============================================================
+elif pagina == "📊 Sobre el Modelo":
+    st.title("📊 Sobre el Modelo")
+    st.caption("Transparencia y justificación académica del modelo de predicción de potencial (TP2).")
+
+    st.subheader("Comparación de modelos evaluados")
+    tabla_modelos = COMPARATIVA_MODELOS.rename(columns={
+        "R2_test": "R² Test", "MAE": "MAE", "RMSE": "RMSE", "Gap_%": "Gap train-test (%)",
+    })
+    st.dataframe(tabla_modelos, use_container_width=True, hide_index=True)
+
+    fig_comp = px.bar(
+        COMPARATIVA_MODELOS.sort_values("R2_test"),
+        x="R2_test", y="Modelo", orientation="h",
+        color="R2_test", color_continuous_scale=[COLOR_GRAY, COLOR_ACCENT],
+        title="R² en test por modelo evaluado",
+        labels={"R2_test": "R² Test"},
+    )
+    fig_comp.update_layout(height=380, plot_bgcolor="white", coloraxis_showscale=False)
+    st.plotly_chart(fig_comp, use_container_width=True)
+
+    st.markdown(
+        f"""
+        **¿Por qué Gradient Boosting Optimizado?** Con hiperparámetros
+        `learning_rate={HIPERPARAMETROS_GB['learning_rate']}`,
+        `max_depth={HIPERPARAMETROS_GB['max_depth']}`,
+        `n_estimators={HIPERPARAMETROS_GB['n_estimators']}`,
+        `subsample={HIPERPARAMETROS_GB['subsample']}` (hallados con `GridSearchCV`), el GB
+        Optimizado obtuvo el mejor R² test (0.9355), el menor error (MAE 0.9973, RMSE 1.5402)
+        y el segundo menor gap train-test (2.23%) de todos los modelos comparados — muy por
+        debajo del Random Forest base (5.99%), lo que indica mejor capacidad de generalización
+        sin sacrificar precisión.
+        """
+    )
+
+    if modelo_disponible:
+        st.markdown("---")
+        st.subheader("Importancia de variables (modelo en producción)")
+        try:
+            gb_step = modelo.named_steps["model"]
+            importancias = pd.DataFrame({
+                "Variable": ALL_FEATURES,
+                "Importancia": gb_step.feature_importances_,
+            }).sort_values("Importancia", ascending=False)
+
+            fig_imp = px.bar(
+                importancias, x="Importancia", y="Variable", orientation="h",
+                color_discrete_sequence=[COLOR_DARK],
+                title="Importancia de las 23 variables del modelo (Gini importance)",
+            )
+            fig_imp.update_layout(height=650, plot_bgcolor="white", yaxis=dict(categoryorder="total ascending"))
+            st.plotly_chart(fig_imp, use_container_width=True)
+        except Exception as e:
+            st.warning(f"No se pudo calcular la importancia de variables: {e}")
+
+        st.markdown("---")
+        st.subheader("Distribución de residuos")
+        st.caption(
+            "Calculada sobre el dataset completo (no sólo el holdout de test) porque el "
+            "split de entrenamiento no se persiste junto al modelo serializado; se muestra "
+            "a fines ilustrativos de la forma del error, no como métrica de evaluación "
+            "(las métricas oficiales de test están en la tabla comparativa de arriba)."
+        )
+        residuos = df[TARGET] - df["potential_predicho"]
+        fig_res = px.histogram(
+            residuos, nbins=60, color_discrete_sequence=[COLOR_ACCENT],
+            title="Distribución de residuos (Real − Predicho)",
+            labels={"value": "Residuo"},
+        )
+        fig_res.update_layout(height=380, plot_bgcolor="white", showlegend=False)
+        st.plotly_chart(fig_res, use_container_width=True)
+
+        st.markdown("---")
+        st.subheader("Sobre los datos")
+        d1, d2, d3 = st.columns(3)
+        d1.metric("Total de jugadores", f"{len(df):,}")
+        d2.metric("Rango de edad", f"{int(df['age'].min())}–{int(df['age'].max())} años")
+        d3.metric("Nacionalidades distintas", f"{df['nationality'].nunique()}")
+
+        if POSITION_COL:
+            conteo_pos = df[POSITION_COL].value_counts().reset_index()
+            conteo_pos.columns = ["Posición", "Cantidad"]
+            fig_pos = px.bar(
+                conteo_pos, x="Cantidad", y="Posición", orientation="h",
+                color_discrete_sequence=[COLOR_GOLD],
+                title="Distribución de posiciones en el dataset",
+            )
+            fig_pos.update_layout(height=380, plot_bgcolor="white")
+            st.plotly_chart(fig_pos, use_container_width=True)
+    else:
+        st.warning(f"Cargá `{MODEL_PATH}` para ver importancia de variables y residuos en vivo.")
