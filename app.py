@@ -20,6 +20,7 @@ import streamlit as st
 
 # ============================================================
 # CONFIGURACIÓN DE PÁGINA
+# (el tema de colores nativo vive en .streamlit/config.toml)
 # ============================================================
 st.set_page_config(
     page_title="FIFA Scout",
@@ -29,30 +30,145 @@ st.set_page_config(
 )
 
 # ============================================================
-# PALETA Y ESTILO — minimalista: grises, azul oscuro, acento verde
+# PALETA — minimalista: grises, azul oscuro, acento verde/dorado
+# (debe coincidir con .streamlit/config.toml)
 # ============================================================
 COLOR_DARK = "#0B2545"      # azul oscuro (headers, texto fuerte)
+COLOR_DARK_2 = "#123761"    # azul oscuro secundario (degradés)
 COLOR_GRAY = "#5B6472"      # gris (texto secundario)
+COLOR_BORDER = "#E5E7EB"    # gris borde de tarjetas
 COLOR_BG_SOFT = "#F4F5F7"   # gris muy claro (fondos de tarjetas)
 COLOR_ACCENT = "#1E8F6F"    # verde (acento principal / positivo)
 COLOR_GOLD = "#C9A227"      # dorado (acento secundario / élite)
 COLOR_WARN = "#B45309"      # naranja (alertas suaves)
+COLOR_GRID = "#EEF0F2"      # líneas de grilla de gráficos
 
+# ============================================================
+# CSS — sistema de diseño (hero headers, cards, tipografía)
+# ============================================================
 st.markdown(
     f"""
     <style>
-        .block-container {{ padding-top: 2rem; }}
-        h1, h2, h3 {{ color: {COLOR_DARK}; }}
-        [data-testid="stMetricValue"] {{ color: {COLOR_DARK}; }}
-        [data-testid="stSidebar"] {{ background-color: {COLOR_BG_SOFT}; }}
-        .fifa-badge {{
-            display:inline-block; padding:2px 10px; border-radius:12px;
-            background:{COLOR_ACCENT}; color:white; font-size:0.75rem; font-weight:600;
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+        html, body, [class*="css"] {{ font-family: 'Inter', sans-serif; }}
+        .block-container {{ padding-top: 1.6rem; padding-bottom: 3rem; max-width: 1200px; }}
+        footer {{ visibility: hidden; }}
+
+        h1, h2, h3 {{ color: {COLOR_DARK}; font-weight: 700; }}
+        h1 {{ font-size: 1.7rem; }}
+        h2 {{ font-size: 1.25rem; }}
+        h3 {{ font-size: 1.05rem; }}
+
+        /* Hero header por página */
+        .fifa-hero {{
+            display: flex; align-items: center; gap: 16px;
+            padding: 20px 24px; margin-bottom: 24px;
+            background: linear-gradient(135deg, {COLOR_DARK} 0%, {COLOR_DARK_2} 100%);
+            border-radius: 14px; color: white;
         }}
+        .fifa-hero-icon {{ font-size: 2.1rem; line-height: 1; }}
+        .fifa-hero-title {{ font-size: 1.45rem; font-weight: 800; color: white; margin: 0; line-height: 1.2; }}
+        .fifa-hero-subtitle {{ font-size: 0.92rem; color: #C7D2E0; margin-top: 3px; }}
+
+        /* Tarjetas KPI */
+        .fifa-kpi {{
+            background: {COLOR_BG_SOFT}; border: 1px solid {COLOR_BORDER}; border-radius: 12px;
+            padding: 14px 16px;
+        }}
+        .fifa-kpi-label {{
+            font-size: 0.74rem; color: {COLOR_GRAY}; text-transform: uppercase;
+            letter-spacing: .04em; font-weight: 600;
+        }}
+        .fifa-kpi-value {{ font-size: 1.6rem; color: {COLOR_DARK}; font-weight: 800; margin-top: 2px; }}
+
+        .fifa-badge {{
+            display: inline-block; padding: 4px 14px; border-radius: 20px;
+            background: {COLOR_ACCENT}; color: white; font-size: 0.8rem; font-weight: 600;
+        }}
+
+        /* Etiquetas de sección (reemplazan bold suelto) */
+        .fifa-section-label {{
+            font-size: 0.76rem; font-weight: 700; color: {COLOR_GRAY};
+            text-transform: uppercase; letter-spacing: .05em;
+            border-bottom: 2px solid {COLOR_ACCENT}; padding-bottom: 6px; margin-bottom: 10px;
+        }}
+
+        /* Sidebar */
+        .fifa-sidebar-brand {{ display: flex; align-items: center; gap: 10px; padding: 2px 0 10px 0; }}
+        .fifa-sidebar-icon {{ font-size: 1.7rem; }}
+        .fifa-sidebar-title {{ font-size: 1.1rem; font-weight: 800; color: {COLOR_DARK}; line-height: 1.1; }}
+        .fifa-sidebar-subtitle {{ font-size: 0.72rem; color: {COLOR_GRAY}; }}
+
+        .fifa-kpi-mini {{
+            background: white; border: 1px solid {COLOR_BORDER}; border-radius: 10px;
+            padding: 10px 12px; text-align: center;
+        }}
+        .fifa-kpi-mini-value {{ font-size: 1.35rem; font-weight: 800; color: {COLOR_ACCENT}; }}
+        .fifa-kpi-mini-label {{ font-size: 0.7rem; color: {COLOR_GRAY}; }}
+
+        /* Dataframes con esquinas redondeadas */
+        [data-testid="stDataFrame"] {{ border: 1px solid {COLOR_BORDER}; border-radius: 10px; overflow: hidden; }}
+
+        button[kind="primary"] {{ border-radius: 8px; font-weight: 600; }}
     </style>
     """,
     unsafe_allow_html=True,
 )
+
+
+def hero(icono: str, titulo: str, subtitulo: str):
+    """Header consistente tipo 'hero' para el tope de cada página."""
+    st.markdown(
+        f"""
+        <div class="fifa-hero">
+            <div class="fifa-hero-icon">{icono}</div>
+            <div>
+                <div class="fifa-hero-title">{titulo}</div>
+                <div class="fifa-hero-subtitle">{subtitulo}</div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def kpi_card(col, label: str, value: str):
+    """Tarjeta KPI dentro de una columna de st.columns()."""
+    with col:
+        st.markdown(
+            f"""
+            <div class="fifa-kpi">
+                <div class="fifa-kpi-label">{label}</div>
+                <div class="fifa-kpi-value">{value}</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+
+def section_label(texto: str):
+    st.markdown(f'<div class="fifa-section-label">{texto}</div>', unsafe_allow_html=True)
+
+
+def estilizar_fig(fig, height=420, showlegend=False):
+    """Aplica un template visual único a todos los gráficos de Plotly de la app."""
+    fig.update_layout(
+        height=height,
+        font_family="Inter, sans-serif",
+        font_color=COLOR_GRAY,
+        title_font_size=16,
+        title_font_color=COLOR_DARK,
+        plot_bgcolor="white",
+        paper_bgcolor="white",
+        margin=dict(l=10, r=10, t=55, b=10),
+        showlegend=showlegend,
+        hoverlabel=dict(bgcolor="white", font_size=12, font_family="Inter, sans-serif"),
+    )
+    fig.update_xaxes(gridcolor=COLOR_GRID, zeroline=False)
+    fig.update_yaxes(gridcolor=COLOR_GRID, zeroline=False)
+    return fig
+
 
 # ============================================================
 # CONSTANTES DEL MODELO — deben coincidir EXACTO con el TP2
@@ -191,9 +307,19 @@ else:
 # ============================================================
 # SIDEBAR — navegación + contador de sesión
 # ============================================================
-st.sidebar.markdown("## ⚽ FIFA Scout")
-st.sidebar.caption("Scouting de jugadores basado en Machine Learning")
-st.sidebar.markdown("---")
+st.sidebar.markdown(
+    """
+    <div class="fifa-sidebar-brand">
+        <div class="fifa-sidebar-icon">⚽</div>
+        <div>
+            <div class="fifa-sidebar-title">FIFA Scout</div>
+            <div class="fifa-sidebar-subtitle">Scouting con Machine Learning</div>
+        </div>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
+st.sidebar.divider()
 
 pagina = st.sidebar.radio(
     "Navegación",
@@ -207,10 +333,16 @@ pagina = st.sidebar.radio(
     label_visibility="collapsed",
 )
 
-st.sidebar.markdown("---")
+st.sidebar.divider()
+total_predicciones = st.session_state.n_predicciones + st.session_state.n_predicciones_lote
 st.sidebar.markdown(
-    f"**Predicciones realizadas en esta sesión:** "
-    f"{st.session_state.n_predicciones + st.session_state.n_predicciones_lote}"
+    f"""
+    <div class="fifa-kpi-mini">
+        <div class="fifa-kpi-mini-value">{total_predicciones}</div>
+        <div class="fifa-kpi-mini-label">Predicciones en esta sesión</div>
+    </div>
+    """,
+    unsafe_allow_html=True,
 )
 st.sidebar.caption("Monitoreo básico de uso (session_state)")
 
@@ -224,8 +356,7 @@ if not modelo_disponible:
 # PÁGINA 1 — EXPLORADOR DE JOYAS
 # ============================================================
 if pagina == "🔍 Explorador de Joyas":
-    st.title("🔍 Explorador de Joyas")
-    st.caption("Identificá jugadores jóvenes con alto potencial predicho y bajo valor de mercado.")
+    hero("🔍", "Explorador de Joyas", "Identificá jugadores jóvenes con alto potencial predicho y bajo valor de mercado.")
 
     if not modelo_disponible:
         st.error(
@@ -235,27 +366,26 @@ if pagina == "🔍 Explorador de Joyas":
         st.stop()
 
     # ---------------- FILTROS (sidebar) ----------------
-    st.sidebar.markdown("### Filtros")
+    with st.sidebar.expander("🔧 Filtros", expanded=True):
+        posiciones_sel = st.multiselect(
+            "Posición", options=POSICIONES, default=[],
+            help="Sin selección = todas las posiciones",
+        )
 
-    posiciones_sel = st.sidebar.multiselect(
-        "Posición", options=POSICIONES, default=[],
-        help="Sin selección = todas las posiciones",
-    )
+        edad_min, edad_max = st.slider("Rango de edad", 15, 45, (15, 45))
 
-    edad_min, edad_max = st.sidebar.slider("Rango de edad", 15, 45, (15, 45))
+        valor_max_dataset = float(df["value_euro"].max()) / 1_000_000
+        valor_min_sel, valor_max_sel = st.slider(
+            "Valor de mercado (millones €)", 0.0, round(valor_max_dataset, 1),
+            (0.0, round(valor_max_dataset, 1)), step=0.5,
+        )
 
-    valor_max_dataset = float(df["value_euro"].max()) / 1_000_000
-    valor_min_sel, valor_max_sel = st.sidebar.slider(
-        "Valor de mercado (millones €)", 0.0, round(valor_max_dataset, 1),
-        (0.0, round(valor_max_dataset, 1)), step=0.5,
-    )
+        nacionalidades_sel = st.multiselect(
+            "Nacionalidad", options=sorted(df["nationality"].unique()), default=[],
+            help="Sin selección = todas las nacionalidades",
+        )
 
-    nacionalidades_sel = st.sidebar.multiselect(
-        "Nacionalidad", options=sorted(df["nationality"].unique()), default=[],
-        help="Sin selección = todas las nacionalidades",
-    )
-
-    overall_min = st.sidebar.slider("Overall rating mínimo", 50, 99, 50)
+        overall_min = st.slider("Overall rating mínimo", 50, 99, 50)
 
     # ---------------- APLICAR FILTROS ----------------
     df_f = df.copy()
@@ -270,7 +400,11 @@ if pagina == "🔍 Explorador de Joyas":
         df_f = df_f[df_f["nationality"].isin(nacionalidades_sel)]
     df_f = df_f[df_f["overall_rating"] >= overall_min]
 
-    st.caption(f"Mostrando **{len(df_f):,}** jugadores de {len(df):,} totales según los filtros aplicados.")
+    k1, k2, k3 = st.columns(3)
+    kpi_card(k1, "Jugadores filtrados", f"{len(df_f):,}")
+    kpi_card(k2, "Total en el dataset", f"{len(df):,}")
+    kpi_card(k3, "Potencial promedio (filtro)", f"{df_f['potential_predicho'].mean():.1f}" if not df_f.empty else "—")
+    st.write("")
 
     # ---------------- SCATTER PRINCIPAL ----------------
     if df_f.empty:
@@ -305,16 +439,12 @@ if pagina == "🔍 Explorador de Joyas":
             title="Valor de Mercado vs. Potencial Predicho",
             opacity=0.72,
         )
-        fig.update_layout(
-            height=560,
-            xaxis_title="Valor de mercado (millones €)",
-            yaxis_title="Potencial predicho",
-            plot_bgcolor="white",
-            title_font_color=COLOR_DARK,
-        )
+        fig = estilizar_fig(fig, height=560)
+        fig.update_xaxes(title="Valor de mercado (millones €)")
+        fig.update_yaxes(title="Potencial predicho")
         st.plotly_chart(fig, use_container_width=True)
 
-    st.markdown("---")
+    st.divider()
 
     # ---------------- TABLA JOYAS OCULTAS ----------------
     st.subheader("💎 Joyas Ocultas")
@@ -363,14 +493,21 @@ if pagina == "🔍 Explorador de Joyas":
             "Potencial Predicho": joyas["potential_predicho"].values,
             "Valor (€)": [formatear_euros(v) for v in joyas["value_euro"].values],
         })
-        st.dataframe(tabla, use_container_width=True, hide_index=True)
+        st.dataframe(
+            tabla, use_container_width=True, hide_index=True,
+            column_config={
+                "Overall": st.column_config.ProgressColumn("Overall", min_value=40, max_value=99, format="%d"),
+                "Potencial Predicho": st.column_config.ProgressColumn(
+                    "Potencial Predicho", min_value=40, max_value=99, format="%.1f"
+                ),
+            },
+        )
 
 # ============================================================
 # PÁGINA 2 — PREDICTOR INDIVIDUAL
 # ============================================================
 elif pagina == "⚡ Predictor Individual":
-    st.title("⚡ Predictor Individual")
-    st.caption("Ingresá los atributos de un jugador y obtené su potencial de crecimiento predicho.")
+    hero("⚡", "Predictor Individual", "Ingresá los atributos de un jugador y obtené su potencial de crecimiento predicho.")
 
     if not modelo_disponible:
         st.error(
@@ -384,43 +521,46 @@ elif pagina == "⚡ Predictor Individual":
     col1, col2, col3 = st.columns(3)
 
     with col1:
-        st.markdown("**Atributos base**")
-        age = st.slider("Edad", int(rangos["age"]["min"]), int(rangos["age"]["max"]), 22)
-        overall_rating = st.slider(
-            "Overall rating", int(rangos["overall_rating"]["min"]), int(rangos["overall_rating"]["max"]), 70
-        )
-        vision = st.slider("Visión", int(rangos["vision"]["min"]), int(rangos["vision"]["max"]), 55)
-        agility = st.slider("Agilidad", int(rangos["agility"]["min"]), int(rangos["agility"]["max"]), 65)
-        standing_tackle = st.slider(
-            "Entrada de pie (standing tackle)", int(rangos["standing_tackle"]["min"]),
-            int(rangos["standing_tackle"]["max"]), 48
-        )
-        strength = st.slider("Fuerza", int(rangos["strength"]["min"]), int(rangos["strength"]["max"]), 65)
+        with st.container(border=True):
+            section_label("Atributos base")
+            age = st.slider("Edad", int(rangos["age"]["min"]), int(rangos["age"]["max"]), 22)
+            overall_rating = st.slider(
+                "Overall rating", int(rangos["overall_rating"]["min"]), int(rangos["overall_rating"]["max"]), 70
+            )
+            vision = st.slider("Visión", int(rangos["vision"]["min"]), int(rangos["vision"]["max"]), 55)
+            agility = st.slider("Agilidad", int(rangos["agility"]["min"]), int(rangos["agility"]["max"]), 65)
+            standing_tackle = st.slider(
+                "Entrada de pie (standing tackle)", int(rangos["standing_tackle"]["min"]),
+                int(rangos["standing_tackle"]["max"]), 48
+            )
+            strength = st.slider("Fuerza", int(rangos["strength"]["min"]), int(rangos["strength"]["max"]), 65)
 
     with col2:
-        st.markdown("**Reputación y scores TP1**")
-        international_reputation = st.slider("Reputación internacional (1-5)", 1, 5, 1)
-        weak_foot = st.slider("Pie malo (1-5)", 1, 5, 3)
-        skill_moves = st.slider("Habilidad de gambeta (1-5)", 1, 5, 2)
-        attack_score = st.slider(
-            "Attack score", float(rangos["attack_score"]["min"]), float(rangos["attack_score"]["max"]), 48.0
-        )
-        defense_score = st.slider(
-            "Defense score", float(rangos["defense_score"]["min"]), float(rangos["defense_score"]["max"]), 48.0
-        )
+        with st.container(border=True):
+            section_label("Reputación y scores TP1")
+            international_reputation = st.slider("Reputación internacional (1-5)", 1, 5, 1)
+            weak_foot = st.slider("Pie malo (1-5)", 1, 5, 3)
+            skill_moves = st.slider("Habilidad de gambeta (1-5)", 1, 5, 2)
+            attack_score = st.slider(
+                "Attack score", float(rangos["attack_score"]["min"]), float(rangos["attack_score"]["max"]), 48.0
+            )
+            defense_score = st.slider(
+                "Defense score", float(rangos["defense_score"]["min"]), float(rangos["defense_score"]["max"]), 48.0
+            )
 
     with col3:
-        st.markdown("**Contexto y posición**")
-        playmaking_score = st.slider(
-            "Playmaking score", float(df["playmaking_score"].min()), float(df["playmaking_score"].max()), 55.0
-        )
-        physical_score = st.slider(
-            "Physical score", float(df["physical_score"].min()), float(df["physical_score"].max()), 65.0
-        )
-        has_release_clause = st.selectbox("¿Tiene cláusula de rescisión?", ["Sí", "No"]) == "Sí"
-        preferred_foot = st.selectbox("Pie preferido", ["Derecho", "Izquierdo"])
-        nacionalidad_sel = st.selectbox("Nacionalidad", sorted(df["nationality"].unique()))
-        posicion_sel = st.selectbox("Posición específica", POSICIONES)
+        with st.container(border=True):
+            section_label("Contexto y posición")
+            playmaking_score = st.slider(
+                "Playmaking score", float(df["playmaking_score"].min()), float(df["playmaking_score"].max()), 55.0
+            )
+            physical_score = st.slider(
+                "Physical score", float(df["physical_score"].min()), float(df["physical_score"].max()), 65.0
+            )
+            has_release_clause = st.selectbox("¿Tiene cláusula de rescisión?", ["Sí", "No"]) == "Sí"
+            preferred_foot = st.selectbox("Pie preferido", ["Derecho", "Izquierdo"])
+            nacionalidad_sel = st.selectbox("Nacionalidad", sorted(df["nationality"].unique()))
+            posicion_sel = st.selectbox("Posición específica", POSICIONES)
 
     st.caption(
         "Nacionalidad y posición se ingresan por nombre y se codifican automáticamente "
@@ -428,7 +568,7 @@ elif pagina == "⚡ Predictor Individual":
         "para evitar combinaciones inválidas que el modelo nunca vio en entrenamiento."
     )
 
-    predecir = st.button("Predecir Potencial", type="primary")
+    predecir = st.button("Predecir Potencial", type="primary", use_container_width=True)
 
     if predecir:
         nationality_freq = int(df["nationality"].value_counts().get(nacionalidad_sel, 1))
@@ -457,42 +597,50 @@ elif pagina == "⚡ Predictor Individual":
 
         st.session_state.n_predicciones += 1
 
-        st.markdown("---")
-        res_col1, res_col2 = st.columns([1, 2])
+        st.divider()
+        with st.container(border=True):
+            res_col1, res_col2 = st.columns([1, 2])
 
-        with res_col1:
-            st.markdown(
-                f"<h1 style='color:{COLOR_DARK}; font-size:4rem; margin-bottom:0;'>"
-                f"{potencial_pred:.1f}</h1>",
-                unsafe_allow_html=True,
-            )
-            st.markdown(
-                f"<span class='fifa-badge'>{clasificar_potencial(potencial_pred)}</span>",
-                unsafe_allow_html=True,
-            )
+            with res_col1:
+                st.markdown(
+                    f"<div style='color:{COLOR_GRAY}; font-size:0.85rem; font-weight:600; "
+                    f"text-transform:uppercase; letter-spacing:.05em;'>Potencial predicho</div>"
+                    f"<h1 style='color:{COLOR_DARK}; font-size:4rem; margin:0;'>{potencial_pred:.1f}</h1>",
+                    unsafe_allow_html=True,
+                )
+                st.markdown(
+                    f"<span class='fifa-badge'>{clasificar_potencial(potencial_pred)}</span>",
+                    unsafe_allow_html=True,
+                )
 
-        with res_col2:
-            gauge = go.Figure(go.Indicator(
-                mode="gauge+number",
-                value=potencial_pred,
-                domain={"x": [0, 1], "y": [0, 1]},
-                gauge={
-                    "axis": {"range": [50, 99]},
-                    "bar": {"color": COLOR_DARK},
-                    "steps": [
-                        {"range": [50, 65], "color": "#E5E7EB"},
-                        {"range": [65, 75], "color": "#BFDBFE"},
-                        {"range": [75, 82], "color": "#93C5FD"},
-                        {"range": [82, 88], "color": "#6EE7B7"},
-                        {"range": [88, 99], "color": COLOR_GOLD},
-                    ],
-                },
-            ))
-            gauge.update_layout(height=280, margin=dict(l=20, r=20, t=20, b=20))
-            st.plotly_chart(gauge, use_container_width=True)
+            with res_col2:
+                gauge = go.Figure(go.Indicator(
+                    mode="gauge+number",
+                    value=potencial_pred,
+                    domain={"x": [0, 1], "y": [0, 1]},
+                    number={"font": {"color": COLOR_DARK, "size": 40}},
+                    gauge={
+                        "axis": {"range": [50, 99], "tickcolor": COLOR_GRAY},
+                        "bar": {"color": COLOR_DARK},
+                        "bgcolor": "white",
+                        "borderwidth": 0,
+                        "steps": [
+                            {"range": [50, 65], "color": "#E5E7EB"},
+                            {"range": [65, 75], "color": "#BFDBFE"},
+                            {"range": [75, 82], "color": "#93C5FD"},
+                            {"range": [82, 88], "color": "#6EE7B7"},
+                            {"range": [88, 99], "color": COLOR_GOLD},
+                        ],
+                    },
+                ))
+                gauge.update_layout(
+                    height=260, margin=dict(l=20, r=20, t=20, b=20),
+                    paper_bgcolor="white", font_family="Inter, sans-serif",
+                )
+                st.plotly_chart(gauge, use_container_width=True)
 
         # ---------------- SHAP — explicabilidad ----------------
-        st.markdown("---")
+        st.divider()
         st.subheader("¿Por qué el modelo predijo esto?")
 
         with st.spinner("Calculando explicabilidad..."):
@@ -515,10 +663,11 @@ elif pagina == "⚡ Predictor Individual":
 
                 import matplotlib.pyplot as plt
 
-                fig_shap, ax = plt.subplots(figsize=(9, 5))
-                shap.plots.waterfall(explicacion, max_display=10, show=False)
-                st.pyplot(fig_shap, use_container_width=True)
-                plt.close(fig_shap)
+                with st.container(border=True):
+                    fig_shap, ax = plt.subplots(figsize=(9, 5))
+                    shap.plots.waterfall(explicacion, max_display=10, show=False)
+                    st.pyplot(fig_shap, use_container_width=True)
+                    plt.close(fig_shap)
 
                 top_feats = pd.Series(np.abs(shap_values[0]), index=ALL_FEATURES).sort_values(ascending=False)
                 top3 = ", ".join(top_feats.head(3).index.tolist())
@@ -532,8 +681,7 @@ elif pagina == "⚡ Predictor Individual":
 # PÁGINA 3 — ANÁLISIS EN LOTE
 # ============================================================
 elif pagina == "📁 Análisis en Lote":
-    st.title("📁 Análisis en Lote")
-    st.caption("Subí un CSV con múltiples jugadores y obtené el potencial predicho para todos a la vez.")
+    hero("📁", "Análisis en Lote", "Subí un CSV con múltiples jugadores y obtené el potencial predicho para todos a la vez.")
 
     if not modelo_disponible:
         st.error(
@@ -594,12 +742,20 @@ elif pagina == "📁 Análisis en Lote":
                     st.success(f"Predicciones calculadas para {len(df_validas):,} jugadores.")
 
                     m1, m2, m3, m4 = st.columns(4)
-                    m1.metric("Jugadores procesados", f"{len(df_validas):,}")
-                    m2.metric("Potencial promedio", f"{df_validas['potential_predicho'].mean():.1f}")
-                    m3.metric("Potencial máximo", f"{df_validas['potential_predicho'].max():.1f}")
-                    m4.metric("Potencial mínimo", f"{df_validas['potential_predicho'].min():.1f}")
+                    kpi_card(m1, "Jugadores procesados", f"{len(df_validas):,}")
+                    kpi_card(m2, "Potencial promedio", f"{df_validas['potential_predicho'].mean():.1f}")
+                    kpi_card(m3, "Potencial máximo", f"{df_validas['potential_predicho'].max():.1f}")
+                    kpi_card(m4, "Potencial mínimo", f"{df_validas['potential_predicho'].min():.1f}")
+                    st.write("")
 
-                    st.dataframe(df_validas, use_container_width=True, hide_index=True)
+                    st.dataframe(
+                        df_validas, use_container_width=True, hide_index=True,
+                        column_config={
+                            "potential_predicho": st.column_config.ProgressColumn(
+                                "Potencial Predicho", min_value=40, max_value=99, format="%.1f"
+                            ),
+                        },
+                    )
 
                     st.download_button(
                         "⬇️ Descargar resultados",
@@ -612,8 +768,7 @@ elif pagina == "📁 Análisis en Lote":
 # PÁGINA 4 — CLASIFICADOR DE POSICIÓN (placeholder TP3)
 # ============================================================
 elif pagina == "🎯 Clasificador de Posición":
-    st.title("🎯 Clasificador de Posición")
-    st.caption("Esta sección integra el modelo de clasificación de posición desarrollado en el TP3.")
+    hero("🎯", "Clasificador de Posición", "Esta sección integra el modelo de clasificación de posición desarrollado en el TP3.")
 
     modelo_tp3 = load_tp3_model()
 
@@ -634,7 +789,7 @@ elif pagina == "🎯 Clasificador de Posición":
                 color_discrete_sequence=[COLOR_DARK],
                 title="Cantidad de jugadores por posición",
             )
-            fig.update_layout(height=420, plot_bgcolor="white")
+            fig = estilizar_fig(fig, height=420)
             st.plotly_chart(fig, use_container_width=True)
     else:
         # El modelo TP3 ya está disponible: se arma la interfaz dinámicamente
@@ -679,7 +834,7 @@ elif pagina == "🎯 Clasificador de Posición":
                         df_proba, x="Probabilidad", y="Posición", orientation="h",
                         color_discrete_sequence=[COLOR_ACCENT],
                     )
-                    fig.update_layout(height=350, plot_bgcolor="white")
+                    fig = estilizar_fig(fig, height=350)
                     st.plotly_chart(fig, use_container_width=True)
             except Exception as e:
                 st.error(f"No se pudo calcular la predicción: {e}")
@@ -688,14 +843,18 @@ elif pagina == "🎯 Clasificador de Posición":
 # PÁGINA 5 — SOBRE EL MODELO
 # ============================================================
 elif pagina == "📊 Sobre el Modelo":
-    st.title("📊 Sobre el Modelo")
-    st.caption("Transparencia y justificación académica del modelo de predicción de potencial (TP2).")
+    hero("📊", "Sobre el Modelo", "Transparencia y justificación académica del modelo de predicción de potencial (TP2).")
 
     st.subheader("Comparación de modelos evaluados")
     tabla_modelos = COMPARATIVA_MODELOS.rename(columns={
         "R2_test": "R² Test", "MAE": "MAE", "RMSE": "RMSE", "Gap_%": "Gap train-test (%)",
     })
-    st.dataframe(tabla_modelos, use_container_width=True, hide_index=True)
+    st.dataframe(
+        tabla_modelos, use_container_width=True, hide_index=True,
+        column_config={
+            "R² Test": st.column_config.ProgressColumn("R² Test", min_value=0.8, max_value=1.0, format="%.4f"),
+        },
+    )
 
     fig_comp = px.bar(
         COMPARATIVA_MODELOS.sort_values("R2_test"),
@@ -704,7 +863,8 @@ elif pagina == "📊 Sobre el Modelo":
         title="R² en test por modelo evaluado",
         labels={"R2_test": "R² Test"},
     )
-    fig_comp.update_layout(height=380, plot_bgcolor="white", coloraxis_showscale=False)
+    fig_comp = estilizar_fig(fig_comp, height=380)
+    fig_comp.update_layout(coloraxis_showscale=False)
     st.plotly_chart(fig_comp, use_container_width=True)
 
     st.markdown(
@@ -722,7 +882,7 @@ elif pagina == "📊 Sobre el Modelo":
     )
 
     if modelo_disponible:
-        st.markdown("---")
+        st.divider()
         st.subheader("Importancia de variables (modelo en producción)")
         try:
             gb_step = modelo.named_steps["model"]
@@ -736,12 +896,13 @@ elif pagina == "📊 Sobre el Modelo":
                 color_discrete_sequence=[COLOR_DARK],
                 title="Importancia de las 23 variables del modelo (Gini importance)",
             )
-            fig_imp.update_layout(height=650, plot_bgcolor="white", yaxis=dict(categoryorder="total ascending"))
+            fig_imp = estilizar_fig(fig_imp, height=650)
+            fig_imp.update_layout(yaxis=dict(categoryorder="total ascending"))
             st.plotly_chart(fig_imp, use_container_width=True)
         except Exception as e:
             st.warning(f"No se pudo calcular la importancia de variables: {e}")
 
-        st.markdown("---")
+        st.divider()
         st.subheader("Distribución de residuos")
         st.caption(
             "Calculada sobre el dataset completo (no sólo el holdout de test) porque el "
@@ -755,15 +916,16 @@ elif pagina == "📊 Sobre el Modelo":
             title="Distribución de residuos (Real − Predicho)",
             labels={"value": "Residuo"},
         )
-        fig_res.update_layout(height=380, plot_bgcolor="white", showlegend=False)
+        fig_res = estilizar_fig(fig_res, height=380)
         st.plotly_chart(fig_res, use_container_width=True)
 
-        st.markdown("---")
+        st.divider()
         st.subheader("Sobre los datos")
         d1, d2, d3 = st.columns(3)
-        d1.metric("Total de jugadores", f"{len(df):,}")
-        d2.metric("Rango de edad", f"{int(df['age'].min())}–{int(df['age'].max())} años")
-        d3.metric("Nacionalidades distintas", f"{df['nationality'].nunique()}")
+        kpi_card(d1, "Total de jugadores", f"{len(df):,}")
+        kpi_card(d2, "Rango de edad", f"{int(df['age'].min())}–{int(df['age'].max())} años")
+        kpi_card(d3, "Nacionalidades distintas", f"{df['nationality'].nunique()}")
+        st.write("")
 
         if POSITION_COL:
             conteo_pos = df[POSITION_COL].value_counts().reset_index()
@@ -773,7 +935,7 @@ elif pagina == "📊 Sobre el Modelo":
                 color_discrete_sequence=[COLOR_GOLD],
                 title="Distribución de posiciones en el dataset",
             )
-            fig_pos.update_layout(height=380, plot_bgcolor="white")
+            fig_pos = estilizar_fig(fig_pos, height=380)
             st.plotly_chart(fig_pos, use_container_width=True)
     else:
         st.warning(f"Cargá `{MODEL_PATH}` para ver importancia de variables y residuos en vivo.")
