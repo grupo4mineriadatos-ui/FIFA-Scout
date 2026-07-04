@@ -348,8 +348,8 @@ st.sidebar.caption("Monitoreo básico de uso (session_state)")
 
 if not modelo_disponible:
     st.sidebar.error(
-        f"No se encontró '{MODEL_PATH}'. Ejecutá la celda de serialización del "
-        f"TP2 y colocá el archivo en la carpeta de la app."
+        f"No se encontró '{MODEL_PATH}'. Ejecutá el notebook de entrenamiento "
+        f"y colocá el archivo serializado en la carpeta de la app."
     )
 
 # ============================================================
@@ -537,25 +537,25 @@ elif pagina == "⚡ Predictor Individual":
 
     with col2:
         with st.container(border=True):
-            section_label("Reputación y scores TP1")
+            section_label("Reputación y scores de juego")
             international_reputation = st.slider("Reputación internacional (1-5)", 1, 5, 1)
             weak_foot = st.slider("Pie malo (1-5)", 1, 5, 3)
             skill_moves = st.slider("Habilidad de gambeta (1-5)", 1, 5, 2)
             attack_score = st.slider(
-                "Attack score", float(rangos["attack_score"]["min"]), float(rangos["attack_score"]["max"]), 48.0
+                "Índice de ataque", float(rangos["attack_score"]["min"]), float(rangos["attack_score"]["max"]), 48.0
             )
             defense_score = st.slider(
-                "Defense score", float(rangos["defense_score"]["min"]), float(rangos["defense_score"]["max"]), 48.0
+                "Índice de defensa", float(rangos["defense_score"]["min"]), float(rangos["defense_score"]["max"]), 48.0
             )
 
     with col3:
         with st.container(border=True):
             section_label("Contexto y posición")
             playmaking_score = st.slider(
-                "Playmaking score", float(df["playmaking_score"].min()), float(df["playmaking_score"].max()), 55.0
+                "Índice de juego asociado", float(df["playmaking_score"].min()), float(df["playmaking_score"].max()), 55.0
             )
             physical_score = st.slider(
-                "Physical score", float(df["physical_score"].min()), float(df["physical_score"].max()), 65.0
+                "Índice físico", float(df["physical_score"].min()), float(df["physical_score"].max()), 65.0
             )
             has_release_clause = st.selectbox("¿Tiene cláusula de rescisión?", ["Sí", "No"]) == "Sí"
             preferred_foot = st.selectbox("Pie preferido", ["Derecho", "Izquierdo"])
@@ -563,10 +563,14 @@ elif pagina == "⚡ Predictor Individual":
             posicion_sel = st.selectbox("Posición específica", POSICIONES)
 
     st.caption(
-        "Nacionalidad y posición se ingresan por nombre y se codifican automáticamente "
-        "(`nationality_freq` = frecuencia real en el dataset, `pos_*` = one-hot exclusivo) "
-        "para evitar combinaciones inválidas que el modelo nunca vio en entrenamiento."
+        "Nacionalidad y posición se ingresan por nombre: la app las codifica automáticamente "
+        "en segundo plano para evitar combinaciones inválidas que el modelo nunca vio en entrenamiento."
     )
+    with st.expander("Detalle técnico de la codificación"):
+        st.caption(
+            "`nationality_freq` = frecuencia real de esa nacionalidad en el dataset de entrenamiento. "
+            "`pos_*` = codificación one-hot exclusiva de la posición seleccionada."
+        )
 
     predecir = st.button("Predecir Potencial", type="primary", use_container_width=True)
 
@@ -703,6 +707,7 @@ elif pagina == "📁 Análisis en Lote":
     )
 
     archivo = st.file_uploader("Subí tu CSV", type=["csv"])
+    st.caption("Formato CSV · tamaño máximo 200 MB.")
 
     if archivo is not None:
         try:
@@ -768,17 +773,18 @@ elif pagina == "📁 Análisis en Lote":
 # PÁGINA 4 — CLASIFICADOR DE POSICIÓN (placeholder TP3)
 # ============================================================
 elif pagina == "🎯 Clasificador de Posición":
-    hero("🎯", "Clasificador de Posición", "Esta sección integra el modelo de clasificación de posición desarrollado en el TP3.")
+    hero("🎯", "Clasificador de Posición", "Predicción de la posición más adecuada para un jugador a partir de sus atributos.")
 
     modelo_tp3 = load_tp3_model()
 
     if modelo_tp3 is None:
-        st.info("🔄 El modelo de clasificación será integrado próximamente.")
-        st.markdown(
-            f"Cuando el archivo `{TP3_MODEL_PATH}` esté disponible, colocalo en la carpeta "
-            "de la app: la interfaz de clasificación (sliders → posición predicha) se activa "
-            "automáticamente, sin modificar el código."
-        )
+        st.info("🔄 Esta funcionalidad está en desarrollo y se habilitará próximamente.")
+        with st.expander("Detalle técnico (equipo de desarrollo)"):
+            st.caption(
+                f"Cuando el archivo `{TP3_MODEL_PATH}` esté disponible, colocalo en la carpeta "
+                "de la app: la interfaz de clasificación (sliders → posición predicha) se activa "
+                "automáticamente, sin modificar el código."
+            )
 
         if modelo_disponible and POSITION_COL:
             st.subheader("Distribución de posiciones en el dataset")
@@ -794,14 +800,14 @@ elif pagina == "🎯 Clasificador de Posición":
     else:
         # El modelo TP3 ya está disponible: se arma la interfaz dinámicamente
         # a partir de las features que el propio modelo espera.
-        st.success("Modelo de clasificación del TP3 cargado correctamente.")
+        st.success("Modelo de clasificación cargado correctamente.")
 
         if hasattr(modelo_tp3, "feature_names_in_"):
             features_tp3 = list(modelo_tp3.feature_names_in_)
         else:
             st.warning(
-                "El modelo no expone `feature_names_in_`; se usan las features del TP2 "
-                "como aproximación. Verificá que coincidan con las usadas en el TP3."
+                "No se pudo determinar automáticamente el nombre de las variables del modelo; "
+                "se usa el mismo conjunto de variables que el predictor de potencial como aproximación."
             )
             features_tp3 = ALL_FEATURES
 
@@ -843,7 +849,7 @@ elif pagina == "🎯 Clasificador de Posición":
 # PÁGINA 5 — SOBRE EL MODELO
 # ============================================================
 elif pagina == "📊 Sobre el Modelo":
-    hero("📊", "Sobre el Modelo", "Transparencia y justificación académica del modelo de predicción de potencial (TP2).")
+    hero("📊", "Sobre el Modelo", "Transparencia y metodología del modelo de predicción de potencial.")
 
     st.subheader("Comparación de modelos evaluados")
     tabla_modelos = COMPARATIVA_MODELOS.rename(columns={
