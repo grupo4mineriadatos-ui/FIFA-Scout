@@ -30,18 +30,56 @@ st.set_page_config(
 )
 
 # ============================================================
-# PALETA — minimalista: grises, azul oscuro, acento verde/dorado
+# PALETA — dark sports-tech: navy profundo, verde césped, dorado élite
+# Contraste verificado (WCAG): ver notas junto a cada color.
 # (debe coincidir con .streamlit/config.toml)
 # ============================================================
-COLOR_DARK = "#0B2545"      # azul oscuro (headers, texto fuerte)
-COLOR_DARK_2 = "#123761"    # azul oscuro secundario (degradés)
-COLOR_GRAY = "#5B6472"      # gris (texto secundario)
-COLOR_BORDER = "#E5E7EB"    # gris borde de tarjetas
-COLOR_BG_SOFT = "#F4F5F7"   # gris muy claro (fondos de tarjetas)
-COLOR_ACCENT = "#1E8F6F"    # verde (acento principal / positivo)
-COLOR_GOLD = "#C9A227"      # dorado (acento secundario / élite)
-COLOR_WARN = "#B45309"      # naranja (alertas suaves)
-COLOR_GRID = "#EEF0F2"      # líneas de grilla de gráficos
+COLOR_BG = "#0B1220"             # fondo de página
+COLOR_SURFACE = "#16213B"        # superficie de tarjetas
+COLOR_SURFACE_2 = "#1B2A47"      # superficie elevada (hero)
+COLOR_BORDER = "#2C3B57"         # borde sutil de tarjetas
+COLOR_TEXT = "#F3F4F6"           # texto principal — 17:1 sobre COLOR_BG
+COLOR_GRAY = "#94A3B8"           # texto secundario — 7.3:1 sobre COLOR_BG
+COLOR_ACCENT = "#16A34A"         # verde césped — botones/badges (con texto oscuro encima)
+COLOR_ACCENT_LIGHT = "#22C55E"   # verde claro — íconos y gráficos decorativos
+COLOR_GOLD = "#D4AF37"           # dorado — tier élite, 8.9:1 sobre COLOR_BG
+COLOR_WARN = "#F59E0B"           # ámbar — alertas suaves
+COLOR_CHART_NEUTRAL = "#5B8DEF"  # azul — gráficos de conteo/ranking neutrales
+COLOR_GRID = "#22304A"           # líneas de grilla, sutiles sobre fondo oscuro
+COLOR_ON_ACCENT = "#08170D"      # texto oscuro sobre fondo verde — 5.7:1, AA
+COLOR_DARK = COLOR_TEXT          # alias retro-compatible: "texto fuerte"
+
+# ============================================================
+# ÍCONOS — set propio en SVG (sin emojis), trazo consistente 1.9px
+# ============================================================
+ICONS = {
+    "search": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" '
+              'stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/>'
+              '<line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>',
+    "bolt": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" '
+            'stroke-linecap="round" stroke-linejoin="round">'
+            '<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>',
+    "folder": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" '
+              'stroke-linecap="round" stroke-linejoin="round">'
+              '<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>',
+    "target": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" '
+              'stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/>'
+              '<circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.3" fill="currentColor" stroke="none"/></svg>',
+    "bar-chart": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" '
+                 'stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="20" x2="12" y2="10"/>'
+                 '<line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/></svg>',
+    "soccer": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" '
+              'stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/>'
+              '<polygon points="12,8.8 15.04,10.99 13.88,14.59 10.12,14.59 8.96,10.99" '
+              'fill="currentColor" stroke="none"/></svg>',
+}
+
+
+def svg_icon(name: str, size: int = 22, color: str = "currentColor") -> str:
+    """Devuelve el SVG inline de un ícono, listo para insertar en HTML propio."""
+    markup = ICONS.get(name, ICONS["search"])
+    return markup.replace("<svg ", f'<svg style="width:{size}px;height:{size}px;display:block;color:{color};" ', 1)
+
 
 # ============================================================
 # CSS — sistema de diseño (hero headers, cards, tipografía)
@@ -49,80 +87,108 @@ COLOR_GRID = "#EEF0F2"      # líneas de grilla de gráficos
 st.markdown(
     f"""
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sora:wght@600;700;800&display=swap');
 
+        html {{ color-scheme: dark; }}
         html, body, [class*="css"] {{ font-family: 'Inter', sans-serif; }}
         .block-container {{ padding-top: 1.6rem; padding-bottom: 3rem; max-width: 1200px; }}
         footer {{ visibility: hidden; }}
 
-        h1, h2, h3 {{ color: {COLOR_DARK}; font-weight: 700; }}
+        h1, h2, h3 {{ color: {COLOR_TEXT}; font-weight: 700; font-family: 'Sora', sans-serif; }}
         h1 {{ font-size: 1.7rem; }}
         h2 {{ font-size: 1.25rem; }}
         h3 {{ font-size: 1.05rem; }}
 
+        /* Foco visible — accesibilidad, nunca se remueve */
+        :focus-visible {{ outline: 2px solid {COLOR_ACCENT_LIGHT} !important; outline-offset: 2px; }}
+
         /* Hero header por página */
         .fifa-hero {{
             display: flex; align-items: center; gap: 16px;
-            padding: 20px 24px; margin-bottom: 24px;
-            background: linear-gradient(135deg, {COLOR_DARK} 0%, {COLOR_DARK_2} 100%);
-            border-radius: 14px; color: white;
+            padding: 18px 24px 18px 20px; margin-bottom: 24px;
+            background: {COLOR_SURFACE_2};
+            border: 1px solid {COLOR_BORDER}; border-left: 4px solid {COLOR_ACCENT_LIGHT};
+            border-radius: 14px;
         }}
-        .fifa-hero-icon {{ font-size: 2.1rem; line-height: 1; }}
-        .fifa-hero-title {{ font-size: 1.45rem; font-weight: 800; color: white; margin: 0; line-height: 1.2; }}
-        .fifa-hero-subtitle {{ font-size: 0.92rem; color: #C7D2E0; margin-top: 3px; }}
+        .fifa-hero-icon {{ line-height: 1; flex-shrink: 0; }}
+        .fifa-hero-title {{
+            font-family: 'Sora', sans-serif; font-size: 1.4rem; font-weight: 700;
+            color: {COLOR_TEXT}; margin: 0; line-height: 1.2;
+        }}
+        .fifa-hero-subtitle {{ font-size: 0.92rem; color: {COLOR_GRAY}; margin-top: 3px; }}
 
         /* Tarjetas KPI */
         .fifa-kpi {{
-            background: {COLOR_BG_SOFT}; border: 1px solid {COLOR_BORDER}; border-radius: 12px;
+            background: {COLOR_SURFACE}; border: 1px solid {COLOR_BORDER}; border-radius: 12px;
             padding: 14px 16px;
         }}
         .fifa-kpi-label {{
             font-size: 0.74rem; color: {COLOR_GRAY}; text-transform: uppercase;
             letter-spacing: .04em; font-weight: 600;
         }}
-        .fifa-kpi-value {{ font-size: 1.6rem; color: {COLOR_DARK}; font-weight: 800; margin-top: 2px; }}
+        .fifa-kpi-value {{
+            font-family: 'Sora', sans-serif; font-size: 1.6rem; color: {COLOR_TEXT};
+            font-weight: 700; margin-top: 2px;
+        }}
 
         .fifa-badge {{
             display: inline-block; padding: 4px 14px; border-radius: 20px;
-            background: {COLOR_ACCENT}; color: white; font-size: 0.8rem; font-weight: 600;
+            background: {COLOR_ACCENT}; color: {COLOR_ON_ACCENT}; font-size: 0.8rem; font-weight: 700;
         }}
 
         /* Etiquetas de sección (reemplazan bold suelto) */
         .fifa-section-label {{
             font-size: 0.76rem; font-weight: 700; color: {COLOR_GRAY};
             text-transform: uppercase; letter-spacing: .05em;
-            border-bottom: 2px solid {COLOR_ACCENT}; padding-bottom: 6px; margin-bottom: 10px;
+            border-bottom: 2px solid {COLOR_ACCENT_LIGHT}; padding-bottom: 6px; margin-bottom: 10px;
         }}
 
         /* Sidebar */
         .fifa-sidebar-brand {{ display: flex; align-items: center; gap: 10px; padding: 2px 0 10px 0; }}
-        .fifa-sidebar-icon {{ font-size: 1.7rem; }}
-        .fifa-sidebar-title {{ font-size: 1.1rem; font-weight: 800; color: {COLOR_DARK}; line-height: 1.1; }}
+        .fifa-sidebar-icon {{ line-height: 1; flex-shrink: 0; }}
+        .fifa-sidebar-title {{
+            font-family: 'Sora', sans-serif; font-size: 1.1rem; font-weight: 700;
+            color: {COLOR_TEXT}; line-height: 1.1;
+        }}
         .fifa-sidebar-subtitle {{ font-size: 0.72rem; color: {COLOR_GRAY}; }}
 
         .fifa-kpi-mini {{
-            background: white; border: 1px solid {COLOR_BORDER}; border-radius: 10px;
+            background: {COLOR_SURFACE}; border: 1px solid {COLOR_BORDER}; border-radius: 10px;
             padding: 10px 12px; text-align: center;
         }}
-        .fifa-kpi-mini-value {{ font-size: 1.35rem; font-weight: 800; color: {COLOR_ACCENT}; }}
+        .fifa-kpi-mini-value {{
+            font-family: 'Sora', sans-serif; font-size: 1.35rem; font-weight: 700; color: {COLOR_ACCENT_LIGHT};
+        }}
         .fifa-kpi-mini-label {{ font-size: 0.7rem; color: {COLOR_GRAY}; }}
 
         /* Dataframes con esquinas redondeadas */
         [data-testid="stDataFrame"] {{ border: 1px solid {COLOR_BORDER}; border-radius: 10px; overflow: hidden; }}
 
-        button[kind="primary"] {{ border-radius: 8px; font-weight: 600; }}
+        button[kind="primary"] {{
+            background-color: {COLOR_ACCENT} !important; color: {COLOR_ON_ACCENT} !important;
+            border: none !important; border-radius: 8px; font-weight: 700;
+        }}
+        button[kind="primary"]:hover {{
+            background-color: {COLOR_ACCENT_LIGHT} !important; color: {COLOR_ON_ACCENT} !important;
+        }}
+
+        /* Números tabulares para alinear cifras en tarjetas y tablas */
+        .fifa-kpi-value, .fifa-kpi-mini-value, [data-testid="stDataFrame"] {{
+            font-variant-numeric: tabular-nums;
+        }}
     </style>
     """,
     unsafe_allow_html=True,
 )
 
 
-def hero(icono: str, titulo: str, subtitulo: str):
+def hero(icon_key: str, titulo: str, subtitulo: str):
     """Header consistente tipo 'hero' para el tope de cada página."""
+    icon_html = svg_icon(icon_key, size=26, color=COLOR_ACCENT_LIGHT)
     st.markdown(
         f"""
         <div class="fifa-hero">
-            <div class="fifa-hero-icon">{icono}</div>
+            <div class="fifa-hero-icon">{icon_html}</div>
             <div>
                 <div class="fifa-hero-title">{titulo}</div>
                 <div class="fifa-hero-subtitle">{subtitulo}</div>
@@ -158,12 +224,13 @@ def estilizar_fig(fig, height=420, showlegend=False):
         font_family="Inter, sans-serif",
         font_color=COLOR_GRAY,
         title_font_size=16,
-        title_font_color=COLOR_DARK,
-        plot_bgcolor="white",
-        paper_bgcolor="white",
+        title_font_color=COLOR_TEXT,
+        plot_bgcolor=COLOR_SURFACE,
+        paper_bgcolor=COLOR_SURFACE,
         margin=dict(l=10, r=10, t=55, b=10),
         showlegend=showlegend,
-        hoverlabel=dict(bgcolor="white", font_size=12, font_family="Inter, sans-serif"),
+        hoverlabel=dict(bgcolor=COLOR_SURFACE_2, font_size=12, font_family="Inter, sans-serif",
+                         font_color=COLOR_TEXT, bordercolor=COLOR_BORDER),
     )
     fig.update_xaxes(gridcolor=COLOR_GRID, zeroline=False)
     fig.update_yaxes(gridcolor=COLOR_GRID, zeroline=False)
@@ -206,7 +273,7 @@ COMPARATIVA_MODELOS = pd.DataFrame([
     {"Modelo": "Árbol de Decisión",              "R2_test": 0.9200, "MAE": 1.1234, "RMSE": 1.7151, "Gap_%": 0.98},
     {"Modelo": "KNN (7 features, K=9)",          "R2_test": 0.9029, "MAE": 1.3427, "RMSE": 1.8898, "Gap_%": 2.14},
     {"Modelo": "Random Forest (base)",           "R2_test": 0.9301, "MAE": 1.0205, "RMSE": 1.6033, "Gap_%": 5.99},
-    {"Modelo": "GB Optimizado (GridSearchCV) ✅", "R2_test": 0.9355, "MAE": 0.9973, "RMSE": 1.5402, "Gap_%": 2.23},
+    {"Modelo": "GB Optimizado (GridSearchCV) — elegido", "R2_test": 0.9355, "MAE": 0.9973, "RMSE": 1.5402, "Gap_%": 2.23},
 ])
 
 HIPERPARAMETROS_GB = {
@@ -308,9 +375,9 @@ else:
 # SIDEBAR — navegación + contador de sesión
 # ============================================================
 st.sidebar.markdown(
-    """
+    f"""
     <div class="fifa-sidebar-brand">
-        <div class="fifa-sidebar-icon">⚽</div>
+        <div class="fifa-sidebar-icon">{svg_icon('soccer', size=28, color=COLOR_ACCENT_LIGHT)}</div>
         <div>
             <div class="fifa-sidebar-title">FIFA Scout</div>
             <div class="fifa-sidebar-subtitle">Scouting con Machine Learning</div>
@@ -324,11 +391,11 @@ st.sidebar.divider()
 pagina = st.sidebar.radio(
     "Navegación",
     [
-        "🔍 Explorador de Joyas",
-        "⚡ Predictor Individual",
-        "📁 Análisis en Lote",
-        "🎯 Clasificador de Posición",
-        "📊 Sobre el Modelo",
+        ":material/search: Explorador de Joyas",
+        ":material/bolt: Predictor Individual",
+        ":material/folder_open: Análisis en Lote",
+        ":material/adjust: Clasificador de Posición",
+        ":material/bar_chart: Sobre el Modelo",
     ],
     label_visibility="collapsed",
 )
@@ -355,8 +422,8 @@ if not modelo_disponible:
 # ============================================================
 # PÁGINA 1 — EXPLORADOR DE JOYAS
 # ============================================================
-if pagina == "🔍 Explorador de Joyas":
-    hero("🔍", "Explorador de Joyas", "Identificá jugadores jóvenes con alto potencial predicho y bajo valor de mercado.")
+if pagina == ":material/search: Explorador de Joyas":
+    hero("search", "Explorador de Joyas", "Identificá jugadores jóvenes con alto potencial predicho y bajo valor de mercado.")
 
     if not modelo_disponible:
         st.error(
@@ -366,7 +433,7 @@ if pagina == "🔍 Explorador de Joyas":
         st.stop()
 
     # ---------------- FILTROS (sidebar) ----------------
-    with st.sidebar.expander("🔧 Filtros", expanded=True):
+    with st.sidebar.expander(":material/tune: Filtros", expanded=True):
         posiciones_sel = st.multiselect(
             "Posición", options=POSICIONES, default=[],
             help="Sin selección = todas las posiciones",
@@ -428,7 +495,7 @@ if pagina == "🔍 Explorador de Joyas":
             color="age",
             size="overall_rating",
             size_max=18,
-            color_continuous_scale=[COLOR_ACCENT, "#F2C14E", COLOR_WARN],
+            color_continuous_scale=[COLOR_ACCENT_LIGHT, COLOR_GOLD, COLOR_WARN],
             hover_name=SHORT_COL,
             hover_data=hover_cols,
             labels={
@@ -447,7 +514,7 @@ if pagina == "🔍 Explorador de Joyas":
     st.divider()
 
     # ---------------- TABLA JOYAS OCULTAS ----------------
-    st.subheader("💎 Joyas Ocultas")
+    st.subheader(":material/diamond: Joyas Ocultas")
     st.caption("Jóvenes (≤23 años) con potencial predicho ≥ 80 y valor de mercado en el 25% más bajo del subconjunto filtrado.")
 
     def calcular_joyas(data, edad_tope, percentil, potencial_min):
@@ -506,8 +573,8 @@ if pagina == "🔍 Explorador de Joyas":
 # ============================================================
 # PÁGINA 2 — PREDICTOR INDIVIDUAL
 # ============================================================
-elif pagina == "⚡ Predictor Individual":
-    hero("⚡", "Predictor Individual", "Ingresá los atributos de un jugador y obtené su potencial de crecimiento predicho.")
+elif pagina == ":material/bolt: Predictor Individual":
+    hero("bolt", "Predictor Individual", "Ingresá los atributos de un jugador y obtené su potencial de crecimiento predicho.")
 
     if not modelo_disponible:
         st.error(
@@ -609,7 +676,7 @@ elif pagina == "⚡ Predictor Individual":
                 st.markdown(
                     f"<div style='color:{COLOR_GRAY}; font-size:0.85rem; font-weight:600; "
                     f"text-transform:uppercase; letter-spacing:.05em;'>Potencial predicho</div>"
-                    f"<h1 style='color:{COLOR_DARK}; font-size:4rem; margin:0;'>{potencial_pred:.1f}</h1>",
+                    f"<h1 style='color:{COLOR_TEXT}; font-family:Sora,sans-serif; font-size:4rem; margin:0;'>{potencial_pred:.1f}</h1>",
                     unsafe_allow_html=True,
                 )
                 st.markdown(
@@ -622,24 +689,25 @@ elif pagina == "⚡ Predictor Individual":
                     mode="gauge+number",
                     value=potencial_pred,
                     domain={"x": [0, 1], "y": [0, 1]},
-                    number={"font": {"color": COLOR_DARK, "size": 40}},
+                    number={"font": {"color": COLOR_TEXT, "size": 40}},
                     gauge={
                         "axis": {"range": [50, 99], "tickcolor": COLOR_GRAY},
-                        "bar": {"color": COLOR_DARK},
-                        "bgcolor": "white",
+                        "bar": {"color": COLOR_ACCENT_LIGHT},
+                        "bgcolor": COLOR_SURFACE,
                         "borderwidth": 0,
                         "steps": [
-                            {"range": [50, 65], "color": "#E5E7EB"},
-                            {"range": [65, 75], "color": "#BFDBFE"},
-                            {"range": [75, 82], "color": "#93C5FD"},
-                            {"range": [82, 88], "color": "#6EE7B7"},
+                            {"range": [50, 65], "color": COLOR_BORDER},
+                            {"range": [65, 75], "color": "#3B4F73"},
+                            {"range": [75, 82], "color": COLOR_CHART_NEUTRAL},
+                            {"range": [82, 88], "color": COLOR_ACCENT},
                             {"range": [88, 99], "color": COLOR_GOLD},
                         ],
                     },
                 ))
                 gauge.update_layout(
                     height=260, margin=dict(l=20, r=20, t=20, b=20),
-                    paper_bgcolor="white", font_family="Inter, sans-serif",
+                    paper_bgcolor=COLOR_SURFACE, font_family="Inter, sans-serif",
+                    font_color=COLOR_TEXT,
                 )
                 st.plotly_chart(gauge, use_container_width=True)
 
@@ -647,7 +715,7 @@ elif pagina == "⚡ Predictor Individual":
         st.divider()
         st.subheader("¿Por qué el modelo predijo esto?")
 
-        with st.spinner("Calculando explicabilidad..."):
+        with st.spinner("Calculando explicabilidad…"):
             try:
                 import shap
 
@@ -669,6 +737,8 @@ elif pagina == "⚡ Predictor Individual":
 
                 with st.container(border=True):
                     fig_shap, ax = plt.subplots(figsize=(9, 5))
+                    fig_shap.patch.set_facecolor("white")
+                    ax.set_facecolor("white")
                     shap.plots.waterfall(explicacion, max_display=10, show=False)
                     st.pyplot(fig_shap, use_container_width=True)
                     plt.close(fig_shap)
@@ -684,8 +754,8 @@ elif pagina == "⚡ Predictor Individual":
 # ============================================================
 # PÁGINA 3 — ANÁLISIS EN LOTE
 # ============================================================
-elif pagina == "📁 Análisis en Lote":
-    hero("📁", "Análisis en Lote", "Subí un CSV con múltiples jugadores y obtené el potencial predicho para todos a la vez.")
+elif pagina == ":material/folder_open: Análisis en Lote":
+    hero("folder", "Análisis en Lote", "Subí un CSV con múltiples jugadores y obtené el potencial predicho para todos a la vez.")
 
     if not modelo_disponible:
         st.error(
@@ -694,13 +764,13 @@ elif pagina == "📁 Análisis en Lote":
         )
         st.stop()
 
-    with st.expander("📋 Columnas requeridas en el CSV", expanded=False):
+    with st.expander(":material/checklist: Columnas requeridas en el CSV", expanded=False):
         st.write(f"El archivo debe contener exactamente estas **{len(ALL_FEATURES)} columnas**:")
         st.code(", ".join(ALL_FEATURES))
 
     plantilla = pd.DataFrame(columns=ALL_FEATURES)
     st.download_button(
-        "⬇️ Descargar plantilla CSV",
+        ":material/download: Descargar plantilla CSV",
         data=plantilla.to_csv(index=False).encode("utf-8"),
         file_name="plantilla_fifa_scout.csv",
         mime="text/csv",
@@ -723,7 +793,7 @@ elif pagina == "📁 Análisis en Lote":
                 f"{', '.join(faltantes)}"
             )
         else:
-            with st.spinner("Aplicando el modelo al lote..."):
+            with st.spinner("Aplicando el modelo al lote…"):
                 df_pred = df_lote.copy()
                 for col in ALL_FEATURES:
                     df_pred[col] = pd.to_numeric(df_pred[col], errors="coerce")
@@ -744,7 +814,7 @@ elif pagina == "📁 Análisis en Lote":
                     )
                     st.session_state.n_predicciones_lote += len(df_validas)
 
-                    st.success(f"Predicciones calculadas para {len(df_validas):,} jugadores.")
+                    st.success(f"Predicciones calculadas para {len(df_validas):,} jugadores.", icon=":material/check_circle:")
 
                     m1, m2, m3, m4 = st.columns(4)
                     kpi_card(m1, "Jugadores procesados", f"{len(df_validas):,}")
@@ -763,7 +833,7 @@ elif pagina == "📁 Análisis en Lote":
                     )
 
                     st.download_button(
-                        "⬇️ Descargar resultados",
+                        ":material/download: Descargar resultados",
                         data=df_validas.to_csv(index=False).encode("utf-8"),
                         file_name="predicciones_fifa_scout.csv",
                         mime="text/csv",
@@ -772,13 +842,13 @@ elif pagina == "📁 Análisis en Lote":
 # ============================================================
 # PÁGINA 4 — CLASIFICADOR DE POSICIÓN (placeholder TP3)
 # ============================================================
-elif pagina == "🎯 Clasificador de Posición":
-    hero("🎯", "Clasificador de Posición", "Predicción de la posición más adecuada para un jugador a partir de sus atributos.")
+elif pagina == ":material/adjust: Clasificador de Posición":
+    hero("target", "Clasificador de Posición", "Predicción de la posición más adecuada para un jugador a partir de sus atributos.")
 
     modelo_tp3 = load_tp3_model()
 
     if modelo_tp3 is None:
-        st.info("🔄 Esta funcionalidad está en desarrollo y se habilitará próximamente.")
+        st.info("Esta funcionalidad está en desarrollo y se habilitará próximamente.", icon=":material/autorenew:")
         with st.expander("Detalle técnico (equipo de desarrollo)"):
             st.caption(
                 f"Cuando el archivo `{TP3_MODEL_PATH}` esté disponible, colocalo en la carpeta "
@@ -792,7 +862,7 @@ elif pagina == "🎯 Clasificador de Posición":
             conteo.columns = ["Posición", "Cantidad"]
             fig = px.bar(
                 conteo, x="Cantidad", y="Posición", orientation="h",
-                color_discrete_sequence=[COLOR_DARK],
+                color_discrete_sequence=[COLOR_CHART_NEUTRAL],
                 title="Cantidad de jugadores por posición",
             )
             fig = estilizar_fig(fig, height=420)
@@ -800,7 +870,7 @@ elif pagina == "🎯 Clasificador de Posición":
     else:
         # El modelo TP3 ya está disponible: se arma la interfaz dinámicamente
         # a partir de las features que el propio modelo espera.
-        st.success("Modelo de clasificación cargado correctamente.")
+        st.success("Modelo de clasificación cargado correctamente.", icon=":material/check_circle:")
 
         if hasattr(modelo_tp3, "feature_names_in_"):
             features_tp3 = list(modelo_tp3.feature_names_in_)
@@ -838,7 +908,7 @@ elif pagina == "🎯 Clasificador de Posición":
                     )
                     fig = px.bar(
                         df_proba, x="Probabilidad", y="Posición", orientation="h",
-                        color_discrete_sequence=[COLOR_ACCENT],
+                        color_discrete_sequence=[COLOR_ACCENT_LIGHT],
                     )
                     fig = estilizar_fig(fig, height=350)
                     st.plotly_chart(fig, use_container_width=True)
@@ -848,8 +918,8 @@ elif pagina == "🎯 Clasificador de Posición":
 # ============================================================
 # PÁGINA 5 — SOBRE EL MODELO
 # ============================================================
-elif pagina == "📊 Sobre el Modelo":
-    hero("📊", "Sobre el Modelo", "Transparencia y metodología del modelo de predicción de potencial.")
+elif pagina == ":material/bar_chart: Sobre el Modelo":
+    hero("bar-chart", "Sobre el Modelo", "Transparencia y metodología del modelo de predicción de potencial.")
 
     st.subheader("Comparación de modelos evaluados")
     tabla_modelos = COMPARATIVA_MODELOS.rename(columns={
@@ -865,7 +935,7 @@ elif pagina == "📊 Sobre el Modelo":
     fig_comp = px.bar(
         COMPARATIVA_MODELOS.sort_values("R2_test"),
         x="R2_test", y="Modelo", orientation="h",
-        color="R2_test", color_continuous_scale=[COLOR_GRAY, COLOR_ACCENT],
+        color="R2_test", color_continuous_scale=[COLOR_GRAY, COLOR_ACCENT_LIGHT],
         title="R² en test por modelo evaluado",
         labels={"R2_test": "R² Test"},
     )
@@ -899,7 +969,7 @@ elif pagina == "📊 Sobre el Modelo":
 
             fig_imp = px.bar(
                 importancias, x="Importancia", y="Variable", orientation="h",
-                color_discrete_sequence=[COLOR_DARK],
+                color_discrete_sequence=[COLOR_CHART_NEUTRAL],
                 title="Importancia de las 23 variables del modelo (Gini importance)",
             )
             fig_imp = estilizar_fig(fig_imp, height=650)
@@ -918,7 +988,7 @@ elif pagina == "📊 Sobre el Modelo":
         )
         residuos = df[TARGET] - df["potential_predicho"]
         fig_res = px.histogram(
-            residuos, nbins=60, color_discrete_sequence=[COLOR_ACCENT],
+            residuos, nbins=60, color_discrete_sequence=[COLOR_ACCENT_LIGHT],
             title="Distribución de residuos (Real − Predicho)",
             labels={"value": "Residuo"},
         )
@@ -938,7 +1008,7 @@ elif pagina == "📊 Sobre el Modelo":
             conteo_pos.columns = ["Posición", "Cantidad"]
             fig_pos = px.bar(
                 conteo_pos, x="Cantidad", y="Posición", orientation="h",
-                color_discrete_sequence=[COLOR_GOLD],
+                color_discrete_sequence=[COLOR_CHART_NEUTRAL],
                 title="Distribución de posiciones en el dataset",
             )
             fig_pos = estilizar_fig(fig_pos, height=380)
